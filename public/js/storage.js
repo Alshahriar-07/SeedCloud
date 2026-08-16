@@ -1,10 +1,10 @@
 import { api } from './api.js';
 import { store, refreshSeedStorage } from './store.js';
 import { navigate } from './router.js';
-import { qs, h, formatBytes, emptyState, toast } from './ui.js';
+import { qs, h, formatBytes, formatStorageBytes, emptyState, toast } from './ui.js';
 import { icon, providerIcon } from './icons.js';
 
-// The Storage page shows the user's Seed Cloud logical quota (1 GB) — the
+// The Storage page shows the user's Seed Cloud logical quota (512 MB) — the
 // backend Google Drive account's own capacity is never surfaced. It also keeps
 // the "By provider" breakdown for the user's personal cloud connections.
 
@@ -77,7 +77,7 @@ export function renderSidebar() {
   const meta = qs('#storage-meta');
   if (store.seed.ready && store.seed.limit) {
     fill.style.width = Math.min(100, store.seed.percentage).toFixed(1) + '%';
-    meta.replaceChildren(h('div', {}, [`${formatBytes(store.seed.used)} of ${formatBytes(store.seed.limit)}`]));
+    meta.replaceChildren(h('div', {}, [`${formatStorageBytes(store.seed.used)} / ${formatStorageBytes(store.seed.limit)}`]));
   } else {
     fill.style.width = '0%';
     meta.replaceChildren(h('div', {}, ['Storage not configured']));
@@ -124,16 +124,24 @@ function buildDom(container) {
     const pct = Math.min(100, s.percentage);
     summary.append(
       h('div', { class: 'storage-title-row' }, [
-        h('span', { class: 'storage-total' }, [formatBytes(s.limit)]),
+        h('span', { class: 'storage-total' }, [formatStorageBytes(s.limit)]),
         h('span', { class: 'storage-name' }, ['Seed Cloud Storage']),
       ]),
       h('div', { class: 'storage-sub' }, [
-        `${formatBytes(s.used)} used · ${formatBytes(free)} available · ${pct.toFixed(1)}%`,
+        `${formatStorageBytes(s.used)} used · ${formatStorageBytes(free)} available · ${pct.toFixed(1)}%`,
       ]),
       h('div', { class: 'storage-bar-lg', style: 'margin-top:14px' }, [
         h('span', { class: 'storage-bar-fill', style: `width:${pct.toFixed(1)}%` }),
       ])
     );
+    if (s.overQuota) {
+      summary.append(
+        h('div', { class: 'notice warn', style: 'margin-top:12px' }, [
+          icon('alert', { size: 15 }),
+          h('span', {}, ['You are over your 512 MB storage limit. Uploads are paused until you free up space.']),
+        ])
+      );
+    }
   } else {
     summary.append(
       h('div', { class: 'notice warn', style: 'margin:0' }, [
@@ -167,7 +175,7 @@ function buildDom(container) {
       emptyState({
         icon: 'upload',
         title: 'Your Seed Cloud storage is empty.',
-        body: 'Upload your first file to get started. You have 1 GB of Seed Cloud storage.',
+        body: 'Upload your first file to get started. You have 512 MB of Seed Cloud storage.',
         action: h('button', { class: 'btn btn-primary', onclick: () => navigate('/upload') }, [icon('upload', { size: 14 }), 'Upload files']),
       })
     );

@@ -43,7 +43,7 @@ const config = {
     redirectUri: process.env.GOOGLE_REDIRECT_URI || '',
   },
   storage: {
-    defaultQuotaBytes: 1073741824, // 1 GiB per Seed Cloud user
+    defaultQuotaBytes: 536870912, // 512 MiB per Seed Cloud user
   },
 };
 

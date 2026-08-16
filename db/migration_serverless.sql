@@ -1,12 +1,12 @@
 -- Seed Cloud — Serverless-compatible persistent state (Vercel)
 -- Run this in the Supabase SQL editor AFTER db/schema.sql and
--- db/migration_google_storage.sql. These tables are REQUIRED once the backend
--- runs on Vercel serverless functions.
+-- db/migration_google_storage.sql. This table is REQUIRED once the backend
+-- runs on Vercel serverless functions and OAuth provider connects are used.
 --
 -- Vercel serverless functions share no process memory, so state that previously
--- lived in an in-process Map (OAuth authorization state, signup math-challenge
--- answers) must be persisted here instead. Both tables are written and read
--- only by the backend using the service_role key (which bypasses RLS).
+-- lived in an in-process Map (OAuth authorization state) must be persisted here
+-- instead. Written and read only by the backend using the service_role key
+-- (which bypasses RLS).
 
 -- OAuth authorization state for:
 --   * provider connects  (/api/oauth/:slug/start -> /api/oauth/:slug/callback)
@@ -26,18 +26,3 @@ alter table public.oauth_state enable row level security;
 -- No anon/authenticated policies: only the service-role backend touches these
 -- rows. The state value is also mirrored to an httpOnly cookie for the browser.
 revoke all on public.oauth_state from anon, authenticated;
-
--- Human-verification math challenges for the signup form. The answer is stored
--- server-side only; a challenge is deleted on every verify attempt (single-use)
--- and expires after 10 minutes.
-create table if not exists public.captcha_challenges (
-  id text primary key,
-  answer integer not null,
-  created_at timestamptz not null default now(),
-  expires_at timestamptz not null
-);
-
-create index if not exists captcha_challenges_expires_idx on public.captcha_challenges (expires_at);
-
-alter table public.captcha_challenges enable row level security;
-revoke all on public.captcha_challenges from anon, authenticated;

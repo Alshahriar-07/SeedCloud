@@ -39,7 +39,17 @@ export function formatBytes(bytes) {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)));
   const value = n / 1024 ** i;
-  return `${value >= 100 ? Math.round(value) : value.toFixed(1)} ${units[i]}`;
+  const isWhole = Math.abs(value - Math.round(value)) < 1e-9;
+  const str = isWhole ? Math.round(value) : value >= 100 ? Math.round(value) : value.toFixed(1);
+  return `${str} ${units[i]}`;
+}
+
+// Formats a Seed Cloud storage figure, showing 0 as "0 MB" so the quota reads
+// like "0 MB / 512 MB".
+export function formatStorageBytes(bytes) {
+  const n = Number(bytes) || 0;
+  if (n <= 0) return '0 MB';
+  return formatBytes(n);
 }
 
 export function formatDate(ts) {

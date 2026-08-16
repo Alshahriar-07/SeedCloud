@@ -8,7 +8,7 @@ export const store = {
   pcloudConnected: false,
   storageByProvider: {},
   googleConfigured: false,
-  seed: { used: 0, limit: 0, available: 0, percentage: 0, ready: false },
+  seed: { used: 0, limit: 0, available: 0, percentage: 0, overQuota: false, ready: false },
 };
 
 export async function refreshProviders() {
@@ -21,7 +21,7 @@ export async function refreshProviders() {
   return data.providers;
 }
 
-// Loads the user's Seed Cloud quota (1 GB logical quota, independent of the
+// Loads the user's Seed Cloud quota (512 MB logical quota, independent of the
 // backend Google Drive account's own quota).
 export async function refreshSeedStorage() {
   try {
@@ -31,10 +31,11 @@ export async function refreshSeedStorage() {
       limit: data.limit || 0,
       available: data.available || 0,
       percentage: data.percentage || 0,
+      overQuota: Boolean(data.overQuota),
       ready: true,
     };
   } catch (err) {
-    store.seed = { used: 0, limit: 0, available: 0, percentage: 0, ready: false };
+    store.seed = { used: 0, limit: 0, available: 0, percentage: 0, overQuota: false, ready: false };
   }
   return store.seed;
 }

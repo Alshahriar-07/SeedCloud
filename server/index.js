@@ -10,7 +10,6 @@ import pcloudRoutes from './routes/pcloud.js';
 import sharesRoutes from './routes/shares.js';
 import storageRoutes from './routes/storage.js';
 import filesRoutes from './routes/files.js';
-import { createMathChallenge, verifyMathChallenge } from './math-captcha.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const app = express();
@@ -31,31 +30,6 @@ app.get('/api/config', (req, res) => {
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, name: 'seed-cloud' });
-});
-
-// Math challenge ("human verification") for the signup form. The challenge is
-// generated server-side; the expected answer is stored in Supabase (it must
-// survive Vercel serverless invocations, which share no memory) and validated
-// on /api/captcha/verify. The answer is never exposed to the browser.
-app.get('/api/captcha', async (req, res, next) => {
-  try {
-    res.json(await createMathChallenge());
-  } catch (err) {
-    next(err);
-  }
-});
-
-app.post('/api/captcha/verify', async (req, res, next) => {
-  try {
-    const { challengeId, answer } = req.body || {};
-    const result = await verifyMathChallenge(challengeId, answer);
-    if (!result.ok) {
-      return res.status(400).json({ verified: false, error: result.reason });
-    }
-    res.json({ verified: true });
-  } catch (err) {
-    next(err);
-  }
 });
 
 app.use('/api/auth', authRoutes);

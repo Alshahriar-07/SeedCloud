@@ -4,7 +4,7 @@
 -- Seed Cloud stores the real file bytes in the Seed Cloud owner's Google Drive
 -- account. Supabase stores only metadata:
 --   storage_accounts  - the single backend Google Drive account (tokens, root folder)
---   user_storage      - per-user Seed Cloud quota (1 GB) + user Drive folder id
+--   user_storage      - per-user Seed Cloud quota (512 MB) + user Drive folder id
 --   files             - metadata for the user's Seed Cloud files (Drive file ids)
 
 -- The backend storage account (owner's Google Drive). Only the service-role
@@ -27,17 +27,25 @@ alter table public.storage_accounts enable row level security;
 -- which bypasses RLS and column grants.
 revoke all on public.storage_accounts from anon, authenticated;
 
--- Per-user Seed Cloud quota (default 1 GiB) and their Drive folder id.
+-- Per-user Seed Cloud quota (default 512 MiB) and their Drive folder id.
+-- is_over_quota marks users whose usage exceeds the quota (existing users
+-- migrated from the old 1 GiB limit); such users cannot upload until usage
+-- drops back under the limit.
 create table if not exists public.user_storage (
   user_id uuid primary key references auth.users (id) on delete cascade,
-  storage_limit bigint not null default 1073741824,
+  storage_limit bigint not null default 536870912,
   storage_used bigint not null default 0,
+  is_over_quota boolean not null default false,
   root_folder_id text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table public.user_storage enable row level security;
+
+-- Guards for a table created by an earlier migration (old 1 GiB default).
+alter table public.user_storage add column if not exists is_over_quota boolean not null default false;
+alter table public.user_storage alter column storage_limit set default 536870912;
 
 create policy "users select own storage"
   on public.user_storage for select to authenticated using (auth.uid() = user_id);
@@ -48,9 +56,10 @@ create policy "users insert own storage"
 create policy "users update own storage"
   on public.user_storage for update to authenticated using (auth.uid() = user_id);
 
--- Users must never set their own quota or Drive folder id.
+-- Users must never set their own quota, usage, over-quota flag or Drive folder id.
 revoke update (storage_limit) on public.user_storage from anon, authenticated;
 revoke update (storage_used) on public.user_storage from anon, authenticated;
+revoke update (is_over_quota) on public.user_storage from anon, authenticated;
 revoke update (root_folder_id) on public.user_storage from anon, authenticated;
 
 -- Metadata for the user's Seed Cloud files. Actual bytes live on Google Drive.

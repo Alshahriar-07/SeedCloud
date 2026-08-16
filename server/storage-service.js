@@ -10,7 +10,7 @@ import { GoogleDrive } from './providers/google-drive/drive.js';
 
 const PROVIDER = 'google-drive';
 const ROOT_FOLDER_NAME = 'Seed Cloud Storage';
-export const DEFAULT_STORAGE_LIMIT = 1073741824; // 1 GiB per Seed Cloud user
+export const DEFAULT_STORAGE_LIMIT = 536870912; // 512 MiB per Seed Cloud user
 
 export class StorageBackendError extends Error {
   constructor(message, code = 'storage_error') {
@@ -107,9 +107,7 @@ async function findOrCreateUserFolder(drive, rootFolderId, userId) {
   return folder;
 }
 
-// Every user gets a user_storage row (1 GB quota) and their own Drive folder
-// Seed Cloud Storage/<user_id>/ whose id is persisted (never name-based lookup).
-export async function ensureUserStorage(userId) {
+async function readUserStorage(userId) {
   const { data, error } = await adminClient
     .from('user_storage')
     .select('*')
@@ -124,6 +122,17 @@ export async function ensureUserStorage(userId) {
       'schema_missing'
     );
   }
+  return data;
+}
+
+// Every user gets a user_storage row (512 MB quota) and their own Drive folder
+// Seed Cloud Storage/<user_id>/ whose id is persisted (never name-based lookup).
+// New user records are created automatically by a database trigger on auth.users
+// insert (db/migration_quota_512mb.sql). This function is the lazy fallback: it
+// never creates a duplicate row (user_id is the primary key) and it fills in the
+// Drive folder id once the backend Drive account is ready.
+export async function ensureUserStorage(userId) {
+  let data = await readUserStorage(userId);
   if (data && data.root_folder_id) return data;
 
   const rootFolderId = await ensureRootFolder();
@@ -140,18 +149,30 @@ export async function ensureUserStorage(userId) {
     return data;
   }
 
-  const { data: inserted, error: insError } = await adminClient
+  // Idempotent insert: if a concurrent trigger already created the row, the
+  // upsert is ignored and we simply reuse it below.
+  const { error: insError } = await adminClient
     .from('user_storage')
-    .insert({
-      user_id: userId,
-      storage_limit: config.storage.defaultQuotaBytes,
-      storage_used: 0,
-      root_folder_id: userFolder.id,
-    })
-    .select()
-    .single();
+    .upsert(
+      {
+        user_id: userId,
+        storage_limit: config.storage.defaultQuotaBytes,
+        storage_used: 0,
+        root_folder_id: userFolder.id,
+      },
+      { onConflict: 'user_id', ignoreDuplicates: true }
+    );
   if (insError) throw new StorageBackendError('Could not create your storage record.', 'database');
-  return inserted;
+
+  const rec = await readUserStorage(userId);
+  if (rec && !rec.root_folder_id) {
+    await adminClient
+      .from('user_storage')
+      .update({ root_folder_id: userFolder.id, updated_at: new Date().toISOString() })
+      .eq('user_id', userId);
+    rec.root_folder_id = userFolder.id;
+  }
+  return rec;
 }
 
 export async function getStorageInfo(userId) {
@@ -163,6 +184,7 @@ export async function getStorageInfo(userId) {
     limit,
     available: Math.max(0, limit - used),
     percentage: limit > 0 ? Math.min(100, (used / limit) * 100) : 0,
+    overQuota: Boolean(rec.is_over_quota),
   };
 }
 
@@ -246,11 +268,9 @@ export async function uploadFile({ userId, name, mimeType, data, folderId }) {
   const used = Number(rec.storage_used) || 0;
   const limit = Number(rec.storage_limit) || config.storage.defaultQuotaBytes;
 
-  if (used + size > limit) {
-    const err = new StorageBackendError(
-      `Storage limit reached. Your Seed Cloud storage limit is ${formatBytes(limit)}.`,
-      'quota_exceeded'
-    );
+  const quotaMessage = 'Storage limit reached. You have 512 MB of free storage.';
+  if (rec.is_over_quota || used + size > limit) {
+    const err = new StorageBackendError(quotaMessage, 'quota_exceeded');
     err.status = 413;
     throw err;
   }
@@ -291,7 +311,7 @@ export async function uploadFile({ userId, name, mimeType, data, folderId }) {
     if (insError) throw insError;
     const { error: usageError } = await adminClient
       .from('user_storage')
-      .update({ storage_used: used + size, updated_at: new Date().toISOString() })
+      .update({ storage_used: used + size, is_over_quota: false, updated_at: new Date().toISOString() })
       .eq('user_id', userId);
     if (usageError) throw usageError;
   } catch (dbErr) {
@@ -398,10 +418,13 @@ export async function deleteFile(userId, fileId) {
   if (delError) throw new StorageBackendError('Could not remove the file metadata.', 'database');
 
   const usage = await loadUsage(userId);
+  const newUsed = Math.max(0, (Number(usage.storage_used) || 0) - (Number(file.size) || 0));
+  const limit = Number(usage.storage_limit) || config.storage.defaultQuotaBytes;
   await adminClient
     .from('user_storage')
     .update({
-      storage_used: Math.max(0, (Number(usage.storage_used) || 0) - (Number(file.size) || 0)),
+      storage_used: newUsed,
+      is_over_quota: newUsed > limit,
       updated_at: new Date().toISOString(),
     })
     .eq('user_id', userId);

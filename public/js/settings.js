@@ -1,6 +1,6 @@
 import { store } from './store.js';
 import * as storage from './storage.js';
-import { qs, h, formatBytes } from './ui.js';
+import { qs, h, formatStorageBytes } from './ui.js';
 import { icon, providerIcon } from './icons.js';
 
 function settingsSection(title, iconName, rows) {
@@ -108,7 +108,7 @@ export async function render() {
         iconName: 'harddrive',
         title: 'Usage',
         desc: s.ready
-          ? `${formatBytes(s.used)} used · ${formatBytes(s.available)} free of ${formatBytes(s.limit)}`
+          ? `${formatStorageBytes(s.used)} used · ${formatStorageBytes(s.available)} free of ${formatStorageBytes(s.limit)}`
           : 'Seed Cloud storage is not configured yet.',
         action: h('button', { class: 'btn btn-secondary btn-sm', onclick: () => { window.location.href = '/storage'; } }, ['Details']),
       }),

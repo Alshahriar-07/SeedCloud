@@ -12,15 +12,8 @@
   var emailHint = document.getElementById('email-hint');
   var passwordHint = document.getElementById('password-hint');
   var confirmHint = document.getElementById('confirm-hint');
-  var captchaQuestion = document.getElementById('captcha-question');
-  var captchaAnswer = document.getElementById('captcha-answer');
-  var captchaHint = document.getElementById('captcha-hint');
-  var captchaRefresh = document.getElementById('captcha-refresh');
 
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  // The challenge id comes from the server; the expected answer stays server-side.
-  var challenge = null;
 
   function showError(message) {
     errBox.textContent = message;
@@ -111,39 +104,6 @@
     return ok;
   }
 
-  function loadChallenge() {
-    return fetch('/api/captcha', { cache: 'no-store' })
-      .then(function (r) {
-        if (!r.ok) throw new Error('captcha unavailable');
-        return r.json();
-      })
-      .then(function (data) {
-        challenge = { id: data.id };
-        captchaQuestion.textContent = 'What is ' + data.expression + '?';
-        captchaAnswer.value = '';
-        setHint(captchaHint, null);
-        captchaAnswer.focus();
-      })
-      .catch(function () {
-        challenge = null;
-        captchaQuestion.textContent = 'Human verification unavailable';
-        setHint(captchaHint, 'Could not load the question. Please refresh and try again.');
-      });
-  }
-
-  function validateCaptcha() {
-    if (!challenge) {
-      setHint(captchaHint, 'Please generate a new question.');
-      return false;
-    }
-    if (!captchaAnswer.value.trim()) {
-      setHint(captchaHint, 'Please solve the calculation.');
-      return false;
-    }
-    setHint(captchaHint, null);
-    return true;
-  }
-
   nameInput.addEventListener('input', validateName);
   emailInput.addEventListener('input', function () {
     errBox.hidden = true;
@@ -151,10 +111,6 @@
   });
   passwordInput.addEventListener('input', validatePassword);
   confirmInput.addEventListener('input', validateConfirm);
-  captchaRefresh.addEventListener('click', loadChallenge);
-  captchaAnswer.addEventListener('input', function () {
-    setHint(captchaHint, null);
-  });
 
   fetch('/api/config')
     .then(function (r) {
@@ -171,13 +127,11 @@
           return null;
         }
         SA.hideLoading();
-        loadChallenge();
 
         form.addEventListener('submit', function (e) {
           e.preventDefault();
           errBox.hidden = true;
           if (!validate()) return;
-          if (!validateCaptcha()) return;
 
           var name = nameInput.value.trim();
           var email = emailInput.value.trim();
@@ -185,60 +139,34 @@
 
           SA.setBusy(submitBtn, true, 'Creating account…');
 
-          fetch('/api/captcha/verify', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ challengeId: challenge.id, answer: captchaAnswer.value.trim() }),
-          })
-            .then(function (r) {
-              return r.json().then(function (data) {
-                return { ok: r.ok, data: data };
-              });
-            })
-            .then(function (result) {
-              if (!result.ok) {
-                var reason = (result.data && result.data.error) || 'incorrect';
-                if (reason === 'expired') {
-                  setHint(captchaHint, 'Please generate a new question.');
-                } else {
-                  setHint(captchaHint, 'Incorrect answer. Try again.');
-                }
-                // A failed attempt is single-use: always issue a fresh question.
-                return loadChallenge().then(function () {
-                  SA.setBusy(submitBtn, false);
-                });
-              }
+          var options = {
+            data: { full_name: name },
+            emailRedirectTo: window.location.origin + '/dashboard',
+          };
+          return client.auth
+            .signUp({ email: email, password: password, options: options })
+            .then(function (res) {
+              if (res.error) throw res.error;
 
-              var options = {
-                data: { full_name: name },
-                emailRedirectTo: window.location.origin + '/dashboard',
-              };
-              return client.auth
-                .signUp({ email: email, password: password, options: options })
-                .then(function (res) {
-                  if (res.error) throw res.error;
+              submitBtn.disabled = true;
+              submitBtn.classList.add('success');
+              submitBtn.textContent = '✓ Account created';
+              try {
+                localStorage.setItem('sc_pending_email', email);
+              } catch (e) {}
 
-                  submitBtn.disabled = true;
-                  submitBtn.classList.add('success');
-                  submitBtn.textContent = '✓ Account created';
-                  try {
-                    localStorage.setItem('sc_pending_email', email);
-                  } catch (e) {}
-
-                  var dest =
-                    res.data && res.data.session
-                      ? '/dashboard'
-                      : '/verify-email?email=' + encodeURIComponent(email);
-                  setTimeout(function () {
-                    window.location.href = dest;
-                  }, 700);
-                });
+              var dest =
+                res.data && res.data.session
+                  ? '/dashboard'
+                  : '/verify-email?email=' + encodeURIComponent(email);
+              setTimeout(function () {
+                window.location.href = dest;
+              }, 700);
             })
             .catch(function (err) {
               SA.setBusy(submitBtn, false);
               submitBtn.classList.remove('success');
               showError(SA.friendlyAuthError(err));
-              loadChallenge();
             });
         });
       });

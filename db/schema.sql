@@ -168,3 +168,59 @@ create policy "users update own shares"
 
 create policy "users delete own shares"
   on public.file_shares for delete to authenticated using (auth.uid() = user_id);
+
+-- Per-user Seed Cloud quota (default 512 MiB / 536,870,912 bytes) + user Drive
+-- folder id. Actual file bytes stay on the connected cloud provider; Supabase
+-- stores only quota + usage + file metadata + provider location.
+-- is_over_quota marks accounts whose usage exceeds the limit (migrated from the
+-- old 1 GiB default): no files are deleted, but new uploads are blocked until
+-- usage drops back under the limit.
+create table if not exists public.user_storage (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  storage_limit bigint not null default 536870912,
+  storage_used bigint not null default 0,
+  is_over_quota boolean not null default false,
+  root_folder_id text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.user_storage enable row level security;
+
+create policy "users select own storage"
+  on public.user_storage for select to authenticated using (auth.uid() = user_id);
+
+create policy "users insert own storage"
+  on public.user_storage for insert to authenticated with check (auth.uid() = user_id);
+
+create policy "users update own storage"
+  on public.user_storage for update to authenticated using (auth.uid() = user_id);
+
+-- Users must never set their own quota, usage, over-quota flag or Drive folder id.
+revoke update (storage_limit) on public.user_storage from anon, authenticated;
+revoke update (storage_used) on public.user_storage from anon, authenticated;
+revoke update (is_over_quota) on public.user_storage from anon, authenticated;
+revoke update (root_folder_id) on public.user_storage from anon, authenticated;
+
+-- Automatically create each new user's storage record exactly once:
+-- storage_limit = 536870912 (512 MiB), storage_used = 0. user_id is the primary
+-- key, so duplicates are impossible even if this runs alongside the backend's
+-- lazy ensureUserStorage() fallback.
+create or replace function public.handle_new_user_storage()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.user_storage (user_id, storage_limit, storage_used)
+  values (new.id, 536870912, 0)
+  on conflict (user_id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_create_storage on auth.users;
+create trigger on_auth_user_create_storage
+after insert on auth.users
+for each row execute function public.handle_new_user_storage();

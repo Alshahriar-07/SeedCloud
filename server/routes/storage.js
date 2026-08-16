@@ -23,7 +23,7 @@ function clearStateCookie(res) {
   res.clearCookie('sc_google_state', { path: '/' });
 }
 
-// GET /api/storage — the authenticated user's Seed Cloud quota (their own 1 GB,
+// GET /api/storage — the authenticated user's Seed Cloud quota (their own 512 MB,
 // NOT the backend Google Drive account's quota).
 router.get('/', requireAuth, async (req, res, next) => {
   try {

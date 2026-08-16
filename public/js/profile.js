@@ -1,6 +1,6 @@
 import { api } from './api.js';
-import { store, refreshProfile, isEmailConfirmed } from './store.js';
-import { qs, h, toast, openModal, closeModal, escapeHtml } from './ui.js';
+import { store, refreshProfile, refreshSeedStorage, isEmailConfirmed } from './store.js';
+import { qs, h, toast, openModal, closeModal, escapeHtml, formatStorageBytes } from './ui.js';
 import { icon, providerIcon } from './icons.js';
 
 function settingsSection(title, iconName, rows) {
@@ -30,6 +30,7 @@ export async function render() {
   } catch (err) {
     store.profile = null;
   }
+  await refreshSeedStorage().catch(() => {});
   if (qs('#view-profile').hidden) return;
 
   const user = store.user;
@@ -88,6 +89,21 @@ export async function render() {
         title: 'Email address',
         desc: 'Used to sign in. Cannot be changed here yet.',
         action: h('div', { class: 'settings-value' }, [escapeHtml(email)]),
+      }),
+    ])
+  );
+
+  // Storage
+  const s = store.seed;
+  body.append(
+    settingsSection('Storage', 'harddrive', [
+      settingsRow({
+        iconName: 'harddrive',
+        title: 'Seed Cloud Storage',
+        desc: s.ready
+          ? `${formatStorageBytes(s.used)} used of ${formatStorageBytes(s.limit)}`
+          : 'Seed Cloud storage is not configured yet.',
+        action: h('button', { class: 'btn btn-secondary btn-sm', onclick: () => { window.location.href = '/storage'; } }, ['Details']),
       }),
     ])
   );

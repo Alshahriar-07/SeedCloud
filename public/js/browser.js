@@ -156,7 +156,7 @@ function renderFiles() {
         title: query ? 'No files match your search' : 'Your Seed Cloud storage is empty.',
         body: query
           ? 'Try a different search or clear the filter.'
-          : 'Upload your first file to get started. You have 1 GB of Seed Cloud storage.',
+          : 'Upload your first file to get started. You have 512 MB of Seed Cloud storage.',
         action: query
           ? null
           : h('button', { class: 'btn btn-primary', onclick: () => navigate('/upload') }, [icon('upload', { size: 14 }), 'Upload files']),

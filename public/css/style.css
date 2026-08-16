@@ -349,29 +349,6 @@ select.input { appearance: none; padding-right: 28px; background-image: url("dat
 .auth-foot-providers { letter-spacing: 0.04em; }
 .auth-foot-secure { display: inline-flex; align-items: center; gap: 6px; }
 
-/* math human-verification on the signup form */
-.math-captcha {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.math-captcha-question {
-  font-size: 13.5px;
-  color: var(--text-secondary);
-  padding: 10px 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-.math-captcha-row { display: flex; gap: 8px; align-items: center; }
-.math-captcha-row .input { flex: 1; }
-.math-captcha-refresh {
-  flex: none;
-  white-space: nowrap;
-  color: var(--text-muted);
-}
-.math-captcha-refresh:hover:not(:disabled) { color: var(--text-secondary); }
-
 /* verify email */
 .verify-icon-tile {
   position: relative;

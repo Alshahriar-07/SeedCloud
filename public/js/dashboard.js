@@ -2,7 +2,7 @@ import { api } from './api.js';
 import { store } from './store.js';
 import * as storage from './storage.js';
 import { navigate } from './router.js';
-import { qs, h, formatBytes, timeAgo, fileIcon } from './ui.js';
+import { qs, h, formatBytes, formatStorageBytes, timeAgo, fileIcon } from './ui.js';
 import { icon, providerIcon } from './icons.js';
 
 export async function render() {
@@ -49,16 +49,22 @@ function storageSection() {
   const body = s.ready
     ? h('div', { class: 'storage-overview-main' }, [
         h('div', { class: 'storage-amount' }, [
-          h('span', { class: 'storage-used' }, [formatBytes(s.used)]),
-          h('span', { class: 'storage-of' }, [`of ${formatBytes(s.limit)} used`]),
+          h('span', { class: 'storage-used' }, [formatStorageBytes(s.used)]),
+          h('span', { class: 'storage-of' }, [`of ${formatStorageBytes(s.limit)} used`]),
         ]),
         h('div', { class: 'storage-bar-lg' }, [
           h('span', { class: 'storage-bar-fill', style: `width:${Math.min(100, s.percentage).toFixed(1)}%` }),
         ]),
         h('div', { class: 'storage-free-line' }, [
           icon('check_circle', { size: 14 }),
-          `${formatBytes(s.available)} free`,
+          `${formatStorageBytes(s.available)} free`,
         ]),
+        s.overQuota
+          ? h('div', { class: 'notice warn', style: 'margin-top:12px' }, [
+              icon('alert', { size: 15 }),
+              h('span', {}, ['You are over your 512 MB storage limit. Uploads are paused until you free up space.']),
+            ])
+          : null,
       ])
     : h('div', { class: 'notice info', style: 'margin:0' }, [
         icon('info', { size: 15 }),

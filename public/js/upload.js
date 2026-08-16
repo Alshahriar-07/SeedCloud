@@ -66,7 +66,7 @@ export function renderPage() {
     h('div', { class: 'upload-page-drop-sub' }, ['Drag files here or choose from your computer']),
     h('button', { class: 'btn btn-primary', type: 'button' }, [icon('plus', { size: 14 }), 'Choose files']),
     h('div', { class: 'storage-sub', style: 'margin-top:14px' }, [
-      'Files upload to your Seed Cloud storage (1 GB limit).',
+      `Files upload to your Seed Cloud storage (${store.seed && store.seed.limit ? formatBytes(store.seed.limit) : '512 MB'} limit).`,
     ]),
   ]);
   body.append(drop);
