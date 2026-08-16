@@ -7,9 +7,14 @@ export const store = {
   providers: [],
   pcloudConnected: false,
   storageByProvider: {},
-  googleConfigured: false,
   seed: { used: 0, limit: 0, available: 0, percentage: 0, overQuota: false, ready: false },
 };
+
+// True when the user has at least one active third-party cloud connection that
+// Seed Cloud can route file bytes to.
+export function hasConnectedCloud() {
+  return store.providers.some((p) => (p.connections || []).some((c) => c.status === 'connected'));
+}
 
 export async function refreshProviders() {
   const data = await api.get('/api/clouds');
@@ -21,8 +26,8 @@ export async function refreshProviders() {
   return data.providers;
 }
 
-// Loads the user's Seed Cloud quota (512 MB logical quota, independent of the
-// backend Google Drive account's own quota).
+// Loads the user's Seed Cloud logical quota (512 MB by default). This is Seed
+// Cloud's own allowance, independent of connected providers' capacity.
 export async function refreshSeedStorage() {
   try {
     const data = await api.get('/api/storage');

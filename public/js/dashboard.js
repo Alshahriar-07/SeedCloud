@@ -59,6 +59,10 @@ function storageSection() {
           icon('check_circle', { size: 14 }),
           `${formatStorageBytes(s.available)} free`,
         ]),
+        h('div', { class: 'storage-free-line' }, [
+          icon('cloud', { size: 14 }),
+          `Connected clouds: ${store.providers.filter((p) => p.status === 'connected').length}`,
+        ]),
         s.overQuota
           ? h('div', { class: 'notice warn', style: 'margin-top:12px' }, [
               icon('alert', { size: 15 }),
@@ -68,7 +72,7 @@ function storageSection() {
       ])
     : h('div', { class: 'notice info', style: 'margin:0' }, [
         icon('info', { size: 15 }),
-        h('span', {}, ['Your Seed Cloud storage is not configured yet.']),
+        h('span', {}, ['Storage information is unavailable right now. Please try again.']),
       ]);
 
   return h('section', { class: 'section' }, [head, h('div', { class: 'panel storage-overview' }, [body])]);

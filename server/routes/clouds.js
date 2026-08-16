@@ -86,6 +86,7 @@ export async function refreshConnection(conn) {
 
   const usage = await provider.getStorageUsage({
     accessToken: conn.access_token,
+    refreshToken: conn.refresh_token,
     apiHost: conn.api_host,
   });
   const storageTotal = usage && usage.total ? usage.total : null;

@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
-import { webStreamToNode } from '../providers/google-drive/drive.js';
 import {
   StorageBackendError,
   listFiles,
@@ -11,6 +10,7 @@ import {
   deleteFile,
   downloadFile,
   safeFile,
+  webStreamToNode,
 } from '../storage-service.js';
 
 const router = Router();
@@ -25,6 +25,8 @@ function handleError(err, res, next) {
         quota_exceeded: 413,
         schema_missing: 503,
         not_authorized: 503,
+        no_cloud_connected: 400,
+        invalid: 400,
         database: 503,
         decrypt: 503,
         provider: 502,
@@ -36,8 +38,9 @@ function handleError(err, res, next) {
 }
 
 // GET /api/files?folder=<provider_file_id>
-// Lists the authenticated user's files inside a folder (defaults to their own
-// Seed Cloud root folder). user_id always comes from the session.
+// Lists the authenticated user's file metadata inside a folder (root when
+// omitted). Metadata is read from Supabase; no storage authorization is
+// required. user_id always comes from the session.
 router.get('/', async (req, res, next) => {
   try {
     const files = await listFiles(req.user.id, req.query.folder || null);
@@ -103,7 +106,8 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-// GET /api/files/:id/download — streams the file from Google Drive.
+// GET /api/files/:id/download — streams the file from the user's connected
+// provider.
 router.get('/:id/download', async (req, res, next) => {
   try {
     const { res: driveRes, file } = await downloadFile(req.user.id, req.params.id);
@@ -118,7 +122,7 @@ router.get('/:id/download', async (req, res, next) => {
   }
 });
 
-// PATCH /api/files/:id — rename (Google Drive + Supabase metadata).
+// PATCH /api/files/:id — rename (provider + Supabase metadata).
 router.patch('/:id', async (req, res, next) => {
   try {
     const { name } = req.body || {};
@@ -129,7 +133,7 @@ router.patch('/:id', async (req, res, next) => {
   }
 });
 
-// DELETE /api/files/:id — delete from Google Drive + metadata + quota.
+// DELETE /api/files/:id — delete from provider + metadata + quota.
 router.delete('/:id', async (req, res, next) => {
   try {
     await deleteFile(req.user.id, req.params.id);

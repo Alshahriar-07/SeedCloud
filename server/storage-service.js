@@ -1,15 +1,19 @@
+import { Readable } from 'node:stream';
 import config from './config.js';
 import { adminClient } from './supabase.js';
-import { encryptToken, decryptToken } from './token-encryption.js';
-import { GoogleDrive } from './providers/google-drive/drive.js';
+import { getProvider } from './providers/index.js';
+import { getPrimaryConnection, getConnectionById, getProviderSlugById } from './connections.js';
 
-// Core logic for Seed Cloud's INTERNAL default storage backend. Real file
-// bytes live in the Seed Cloud owner's Google Drive account. Supabase stores
-// only metadata (file rows, quota, Drive folder ids) and auth data. This module
-// never runs in the browser and never returns tokens to a client.
+// Seed Cloud is a CLOUD STORAGE ROUTER. Actual file bytes live ONLY on the
+// user's connected third-party cloud providers (their Google Drive, pCloud,
+// Dropbox, ...). Supabase stores ONLY:
+//   - auth (Supabase Auth)
+//   - the user's logical quota (user_storage)
+//   - file metadata (files)
+//   - provider connection metadata (connected_accounts)
+// This module never runs in the browser, never returns a provider token, and
+// never uses Supabase Storage for file bytes.
 
-const PROVIDER = 'google-drive';
-const ROOT_FOLDER_NAME = 'Seed Cloud Storage';
 export const DEFAULT_STORAGE_LIMIT = 536870912; // 512 MiB per Seed Cloud user
 
 export class StorageBackendError extends Error {
@@ -33,79 +37,11 @@ export function formatBytes(bytes) {
   return `${num >= 100 ? num.toFixed(0) : num.toFixed(1)} ${units[i]}`;
 }
 
-export function googleConfigured() {
-  return Boolean(config.google.clientId && config.google.clientSecret && config.google.redirectUri);
-}
-
-// Loads the single backend storage account row (provider = google-drive).
-// Throws a clear StorageBackendError when it does not exist / is not authorized.
-export async function getBackendAccount() {
-  const { data, error } = await adminClient
-    .from('storage_accounts')
-    .select('*')
-    .eq('provider', PROVIDER)
-    .maybeSingle();
-  if (error && !isMissingTable(error)) {
-    throw new StorageBackendError('Could not read the storage backend account.', 'database');
-  }
-  if (isMissingTable(error)) {
-    throw new StorageBackendError(
-      'Seed Cloud storage database is not set up yet. Apply db/migration_google_storage.sql in the Supabase SQL editor.',
-      'schema_missing'
-    );
-  }
-  if (!data || data.status !== 'authorized' || !data.refresh_token_enc) {
-    throw new StorageBackendError(
-      'Seed Cloud storage backend is not authorized. The owner must authorize the Google Drive account.',
-      'not_authorized'
-    );
-  }
-  return data;
-}
-
-export async function getDrive() {
-  const account = await getBackendAccount();
-  let refreshToken;
-  try {
-    refreshToken = decryptToken(account.refresh_token_enc);
-  } catch (err) {
-    throw new StorageBackendError(
-      'Stored Google credentials could not be decrypted (TOKEN_ENCRYPTION_SECRET may have changed).',
-      'decrypt'
-    );
-  }
-  return new GoogleDrive({
-    clientId: config.google.clientId,
-    clientSecret: config.google.clientSecret,
-    redirectUri: config.google.redirectUri,
-    refreshToken,
-  });
-}
-
-// Finds or creates the single "Seed Cloud Storage" root folder inside the
-// backend Drive account. The id is persisted in storage_accounts so restarts
-// never create duplicates.
-export async function ensureRootFolder() {
-  const account = await getBackendAccount();
-  if (account.root_folder_id) return account.root_folder_id;
-
-  const drive = await getDrive();
-  let folder = await drive.findFolder(null, ROOT_FOLDER_NAME);
-  if (!folder) folder = await drive.createFolder(ROOT_FOLDER_NAME, null);
-
-  const { error } = await adminClient
-    .from('storage_accounts')
-    .update({ root_folder_id: folder.id, updated_at: new Date().toISOString() })
-    .eq('id', account.id);
-  if (error) throw new StorageBackendError('Could not persist the Seed Cloud root folder.', 'database');
-  return folder.id;
-}
-
-async function findOrCreateUserFolder(drive, rootFolderId, userId) {
-  let folder = await drive.findFolder(rootFolderId, userId);
-  if (!folder) folder = await drive.createFolder(userId, rootFolderId);
-  return folder;
-}
+// ---------------------------------------------------------------------------
+// Logical Seed Cloud quota (user_storage). The quota is the LOGICAL Seed Cloud
+// allowance (512 MiB by default) and is independent of the connected
+// providers' physical capacity.
+// ---------------------------------------------------------------------------
 
 async function readUserStorage(userId) {
   const { data, error } = await adminClient
@@ -118,25 +54,21 @@ async function readUserStorage(userId) {
   }
   if (isMissingTable(error)) {
     throw new StorageBackendError(
-      'Seed Cloud storage database is not set up yet. Apply db/migration_512mb_storage.sql in the Supabase SQL editor.',
+      'Seed Cloud database is not set up yet. Apply the SQL migrations in the Supabase SQL editor.',
       'schema_missing'
     );
   }
   return data;
 }
 
-// Every user gets a user_storage row (512 MB quota). New user records are
-// created automatically by a database trigger on auth.users insert
-// (db/migration_512mb_storage.sql). This function is the lazy fallback: it
-// never creates a duplicate row (user_id is the primary key / unique index) and
-// it NEVER touches the Drive backend, so quota reads work even before the
-// Google Drive storage backend is authorized.
+// Returns the user's storage row, creating it with the default 512 MiB quota if
+// it does not exist. New user records are normally created by a database
+// trigger on auth.users insert (db/migration_512mb_storage.sql); this is the
+// idempotent lazy fallback (user_id is the primary key / unique index).
 export async function ensureUserStorage(userId) {
   let data = await readUserStorage(userId);
   if (data) return data;
 
-  // Idempotent insert: if a concurrent trigger already created the row, the
-  // upsert is ignored and we simply reuse it below.
   const { error: insError } = await adminClient
     .from('user_storage')
     .upsert(
@@ -154,27 +86,6 @@ export async function ensureUserStorage(userId) {
   return rec;
 }
 
-// Ensures the user's storage row AND their own Drive folder
-// Seed Cloud Storage/<user_id>/ whose id is persisted (never name-based lookup).
-// Only operations that need a real Drive location call this (list, upload,
-// create folder); quota reads never do.
-export async function ensureUserFolder(userId) {
-  const rec = await ensureUserStorage(userId);
-  if (rec.root_folder_id) return rec;
-
-  const rootFolderId = await ensureRootFolder();
-  const drive = await getDrive();
-  const userFolder = await findOrCreateUserFolder(drive, rootFolderId, userId);
-
-  const { error: updError } = await adminClient
-    .from('user_storage')
-    .update({ root_folder_id: userFolder.id, updated_at: new Date().toISOString() })
-    .eq('user_id', userId);
-  if (updError) throw new StorageBackendError('Could not persist your storage folder.', 'database');
-  rec.root_folder_id = userFolder.id;
-  return rec;
-}
-
 export async function getStorageInfo(userId) {
   const rec = await ensureUserStorage(userId);
   const used = Number(rec.storage_used) || 0;
@@ -188,6 +99,70 @@ export async function getStorageInfo(userId) {
   };
 }
 
+async function loadUsage(userId) {
+  const { data, error } = await adminClient
+    .from('user_storage')
+    .select('storage_used, storage_limit')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error && !isMissingTable(error)) throw new StorageBackendError('Could not read your storage usage.', 'database');
+  if (!data) throw new StorageBackendError('No storage record found for this user.', 'database');
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Provider routing
+// ---------------------------------------------------------------------------
+
+// Shape passed to provider adapters: server-side, token already decrypted.
+function providerConn(conn) {
+  return {
+    accessToken: conn.access_token,
+    refreshToken: conn.refresh_token,
+    apiHost: conn.api_host,
+    tokenType: conn.token_type,
+  };
+}
+
+// Resolves the connected account that actually holds a file row (so rename /
+// delete / download always go back to the right provider account).
+async function requireConnectionForRow(userId, row) {
+  if (!row.connected_account_id) {
+    throw new StorageBackendError(
+      'The cloud that holds this file is no longer connected. Reconnect it to manage the file.',
+      'not_found'
+    );
+  }
+  const conn = await getConnectionById({ id: row.connected_account_id, userId });
+  if (!conn || conn.status !== 'connected') {
+    throw new StorageBackendError(
+      'The cloud that holds this file is no longer connected. Reconnect it to manage the file.',
+      'not_found'
+    );
+  }
+  const slug = await getProviderSlugById(conn.provider_id);
+  const provider = getProvider(slug);
+  if (!provider) throw new StorageBackendError('The provider for this file is not available.', 'provider');
+  return { conn, provider };
+}
+
+function ensureCapability(provider, capability) {
+  const caps = typeof provider.capabilities === 'function' ? provider.capabilities() : {};
+  if (!caps[capability]) {
+    throw new StorageBackendError(`${provider.name} does not support ${capability} yet.`, 'provider');
+  }
+}
+
+function cleanName(name) {
+  const value = String(name || '').trim();
+  if (!value || value.length > 255 || value.includes('\u0000')) return null;
+  return value;
+}
+
+// ---------------------------------------------------------------------------
+// File metadata (files table) + operations routed to the connected provider
+// ---------------------------------------------------------------------------
+
 export function safeFile(row) {
   return {
     id: row.provider_file_id,
@@ -196,29 +171,11 @@ export function safeFile(row) {
     mimeType: row.mime_type,
     size: Number(row.size) || 0,
     isFolder: Boolean(row.is_folder),
-    parentFolderId: row.parent_folder_id,
+    parentFolderId: row.parent_folder_id || null,
     provider: 'Seed Cloud Storage',
     modified: row.updated_at ? new Date(row.updated_at).getTime() : null,
     createdAt: row.created_at,
   };
-}
-
-// Lists the user's files inside a folder (defaults to their own root folder).
-// user_id is always taken from the authenticated session, never the client.
-export async function listFiles(userId, folderId = null) {
-  const rec = await ensureUserFolder(userId);
-  const parent = folderId || rec.root_folder_id;
-  let query = adminClient.from('files').select('*').eq('user_id', userId).order('name', { ascending: true });
-  if (parent) query = query.eq('parent_folder_id', parent);
-  const { data, error } = await query;
-  if (error && !isMissingTable(error)) throw new StorageBackendError('Could not list your files.', 'database');
-  if (isMissingTable(error)) {
-    throw new StorageBackendError(
-      'Seed Cloud storage database is not set up yet. Apply db/migration_google_storage.sql in the Supabase SQL editor.',
-      'schema_missing'
-    );
-  }
-  return (data || []).map(safeFile);
 }
 
 export async function getUserFile(userId, fileId) {
@@ -232,7 +189,7 @@ export async function getUserFile(userId, fileId) {
   if (error && !isMissingTable(error)) throw new StorageBackendError('Could not read the file.', 'database');
   if (isMissingTable(error)) {
     throw new StorageBackendError(
-      'Seed Cloud storage database is not set up yet. Apply db/migration_google_storage.sql in the Supabase SQL editor.',
+      'Seed Cloud database is not set up yet. Apply the SQL migrations in the Supabase SQL editor.',
       'schema_missing'
     );
   }
@@ -245,25 +202,25 @@ export async function getUserFile(userId, fileId) {
   return null;
 }
 
-function cleanName(name) {
-  const value = String(name || '').trim();
-  if (!value || value.length > 255 || value.includes('\u0000')) return null;
-  return value;
-}
-
-async function loadUsage(userId) {
-  const { data, error } = await adminClient
-    .from('user_storage')
-    .select('storage_used, storage_limit')
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (error && !isMissingTable(error)) throw new StorageBackendError('Could not read your storage usage.', 'database');
-  if (!data) throw new StorageBackendError('No storage record found for this user.', 'database');
-  return data;
+// Lists the user's files inside a folder. Root = rows with no parent folder.
+// user_id is always taken from the authenticated session, never the client.
+export async function listFiles(userId, folderId = null) {
+  let query = adminClient.from('files').select('*').eq('user_id', userId);
+  if (folderId) query = query.eq('parent_folder_id', folderId);
+  else query = query.is('parent_folder_id', null);
+  const { data, error } = await query.order('name', { ascending: true });
+  if (error && !isMissingTable(error)) throw new StorageBackendError('Could not list your files.', 'database');
+  if (isMissingTable(error)) {
+    throw new StorageBackendError(
+      'Seed Cloud database is not set up yet. Apply the SQL migrations in the Supabase SQL editor.',
+      'schema_missing'
+    );
+  }
+  return (data || []).map(safeFile);
 }
 
 export async function uploadFile({ userId, name, mimeType, data, folderId }) {
-  const rec = await ensureUserFolder(userId);
+  const rec = await ensureUserStorage(userId);
   const size = Buffer.byteLength(data);
   const used = Number(rec.storage_used) || 0;
   const limit = Number(rec.storage_limit) || config.storage.defaultQuotaBytes;
@@ -275,37 +232,39 @@ export async function uploadFile({ userId, name, mimeType, data, folderId }) {
     throw err;
   }
 
-  let parentId = rec.root_folder_id;
-  if (folderId) {
-    const folder = await getUserFile(userId, folderId);
-    if (!folder || !folder.is_folder) throw new StorageBackendError('Target folder not found.', 'not_found');
-    parentId = folder.provider_file_id;
-  }
+  const clean = cleanName(name);
+  if (!clean) throw new StorageBackendError('Invalid file name.');
 
-  const drive = await getDrive();
-  let driveFile;
+  const primary = await getPrimaryConnection(userId);
+  if (!primary) {
+    throw new StorageBackendError('Connect a cloud storage provider before uploading files.', 'no_cloud_connected');
+  }
+  const { conn, provider } = primary;
+  ensureCapability(provider, 'upload');
+
+  let uploaded;
   try {
-    driveFile = await drive.uploadFile({
-      folderId: parentId,
-      name,
-      mimeType: mimeType || 'application/octet-stream',
+    uploaded = await provider.upload(providerConn(conn), {
+      filename: clean,
+      folderId: folderId || undefined,
       data,
     });
   } catch (err) {
-    throw new StorageBackendError(`Upload to Google Drive failed: ${err.message}`, 'provider');
+    throw new StorageBackendError(`Upload to ${provider.name} failed: ${err.message}`, 'provider');
   }
 
   // Metadata + usage must move together. If the database write fails after the
-  // Drive upload, clean up the orphaned Drive file so quota stays consistent.
+  // provider upload, delete the just-uploaded file so quota stays consistent.
   try {
     const { error: insError } = await adminClient.from('files').insert({
       user_id: userId,
-      name,
-      mime_type: mimeType || driveFile.mimeType || null,
+      name: clean,
+      mime_type: mimeType || uploaded.mimeType || null,
       size,
-      provider: PROVIDER,
-      provider_file_id: driveFile.id,
-      parent_folder_id: parentId,
+      provider: provider.id,
+      connected_account_id: conn.id,
+      provider_file_id: String(uploaded.id),
+      parent_folder_id: folderId || null,
       is_folder: false,
     });
     if (insError) throw insError;
@@ -316,40 +275,36 @@ export async function uploadFile({ userId, name, mimeType, data, folderId }) {
     if (usageError) throw usageError;
   } catch (dbErr) {
     try {
-      await drive.delete(driveFile.id);
+      await provider.delete(providerConn(conn), { fileId: uploaded.id, isFolder: false });
     } catch (cleanupErr) {
-      console.error('[storage] orphaned Drive file cleanup failed:', cleanupErr.message);
+      console.error('[files] orphaned provider file cleanup failed:', cleanupErr.message);
     }
     throw new StorageBackendError('Could not save the uploaded file metadata.', 'database');
   }
 
-  const { data: saved } = await adminClient
-    .from('files')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('provider_file_id', driveFile.id)
-    .maybeSingle();
-  return safeFile(saved);
+  const saved = await getUserFile(userId, String(uploaded.id));
+  return saved ? safeFile(saved) : null;
 }
 
 export async function createUserFolder(userId, name, folderId) {
-  const rec = await ensureUserFolder(userId);
   const clean = cleanName(name);
   if (!clean) throw new StorageBackendError('Invalid folder name.');
 
-  let parentId = rec.root_folder_id;
-  if (folderId) {
-    const folder = await getUserFile(userId, folderId);
-    if (!folder || !folder.is_folder) throw new StorageBackendError('Target folder not found.', 'not_found');
-    parentId = folder.provider_file_id;
+  const primary = await getPrimaryConnection(userId);
+  if (!primary) {
+    throw new StorageBackendError('Connect a cloud storage provider before creating folders.', 'no_cloud_connected');
   }
+  const { conn, provider } = primary;
+  ensureCapability(provider, 'createFolder');
 
-  const drive = await getDrive();
-  let driveFolder;
+  let created;
   try {
-    driveFolder = await drive.createFolder(clean, parentId);
+    created = await provider.createFolder(providerConn(conn), {
+      name: clean,
+      parentId: folderId || undefined,
+    });
   } catch (err) {
-    throw new StorageBackendError(`Could not create the folder in Google Drive: ${err.message}`, 'provider');
+    throw new StorageBackendError(`Could not create the folder in ${provider.name}: ${err.message}`, 'provider');
   }
 
   const { error: insError } = await adminClient.from('files').insert({
@@ -357,26 +312,22 @@ export async function createUserFolder(userId, name, folderId) {
     name: clean,
     mime_type: 'application/vnd.google-apps.folder',
     size: 0,
-    provider: PROVIDER,
-    provider_file_id: driveFolder.id,
-    parent_folder_id: parentId,
+    provider: provider.id,
+    connected_account_id: conn.id,
+    provider_file_id: String(created.id),
+    parent_folder_id: folderId || null,
     is_folder: true,
   });
   if (insError) {
     try {
-      await drive.delete(driveFolder.id);
+      await provider.delete(providerConn(conn), { fileId: created.id, isFolder: true });
     } catch (cleanupErr) {
-      console.error('[storage] orphaned folder cleanup failed:', cleanupErr.message);
+      console.error('[files] orphaned folder cleanup failed:', cleanupErr.message);
     }
     throw new StorageBackendError('Could not save the folder.', 'database');
   }
-  const { data: saved } = await adminClient
-    .from('files')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('provider_file_id', driveFolder.id)
-    .maybeSingle();
-  return safeFile(saved);
+  const saved = await getUserFile(userId, String(created.id));
+  return saved ? safeFile(saved) : null;
 }
 
 export async function renameFile(userId, fileId, name) {
@@ -385,11 +336,15 @@ export async function renameFile(userId, fileId, name) {
   const clean = cleanName(name);
   if (!clean) throw new StorageBackendError('Invalid file name.');
 
-  const drive = await getDrive();
+  const { conn, provider } = await requireConnectionForRow(userId, file);
   try {
-    await drive.rename(file.provider_file_id, clean);
+    await provider.rename(providerConn(conn), {
+      fileId: file.provider_file_id,
+      newName: clean,
+      isFolder: file.is_folder,
+    });
   } catch (err) {
-    throw new StorageBackendError(`Could not rename the file in Google Drive: ${err.message}`, 'provider');
+    throw new StorageBackendError(`Could not rename the file in ${provider.name}: ${err.message}`, 'provider');
   }
 
   const { error: updError } = await adminClient
@@ -399,7 +354,7 @@ export async function renameFile(userId, fileId, name) {
     .eq('user_id', userId);
   if (updError) throw new StorageBackendError('Could not update the file name.', 'database');
 
-  const { data: updated } = await adminClient.from('files').select('*').eq('id', file.id).maybeSingle();
+  const updated = await getUserFile(userId, fileId);
   return safeFile(updated);
 }
 
@@ -407,11 +362,11 @@ export async function deleteFile(userId, fileId) {
   const file = await getUserFile(userId, fileId);
   if (!file) throw new StorageBackendError('File not found.', 'not_found');
 
-  const drive = await getDrive();
+  const { conn, provider } = await requireConnectionForRow(userId, file);
   try {
-    await drive.delete(file.provider_file_id);
+    await provider.delete(providerConn(conn), { fileId: file.provider_file_id, isFolder: file.is_folder });
   } catch (err) {
-    throw new StorageBackendError(`Could not delete the file in Google Drive: ${err.message}`, 'provider');
+    throw new StorageBackendError(`Could not delete the file in ${provider.name}: ${err.message}`, 'provider');
   }
 
   const { error: delError } = await adminClient.from('files').delete().eq('id', file.id).eq('user_id', userId);
@@ -435,30 +390,19 @@ export async function downloadFile(userId, fileId) {
   const file = await getUserFile(userId, fileId);
   if (!file) throw new StorageBackendError('File not found.', 'not_found');
   if (file.is_folder) throw new StorageBackendError('Cannot download a folder.', 'invalid');
-  const drive = await getDrive();
-  const res = await drive.download(file.provider_file_id);
+
+  const { conn, provider } = await requireConnectionForRow(userId, file);
+  let res;
+  try {
+    res = await provider.download(providerConn(conn), file.provider_file_id);
+  } catch (err) {
+    throw new StorageBackendError(`Could not download the file from ${provider.name}: ${err.message}`, 'provider');
+  }
   return { res, file };
 }
 
-export async function saveBackendAccount({ refreshToken, email }) {
-  const { data: existing } = await adminClient
-    .from('storage_accounts')
-    .select('id')
-    .eq('provider', PROVIDER)
-    .maybeSingle();
-  const payload = {
-    provider: PROVIDER,
-    status: 'authorized',
-    refresh_token_enc: encryptToken(refreshToken),
-    account_email: email || null,
-    updated_at: new Date().toISOString(),
-  };
-  if (existing) {
-    const { error } = await adminClient.from('storage_accounts').update(payload).eq('id', existing.id);
-    if (error) throw error;
-    return existing.id;
-  }
-  const { error, data } = await adminClient.from('storage_accounts').insert({ ...payload, root_folder_id: null }).select().single();
-  if (error) throw error;
-  return data.id;
+export function webStreamToNode(webStream) {
+  if (!webStream) throw new Error('No response body');
+  if (typeof webStream[Symbol.asyncIterator] === 'function') return Readable.from(webStream);
+  return Readable.fromWeb(webStream);
 }

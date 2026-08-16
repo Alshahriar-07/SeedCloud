@@ -1,16 +1,15 @@
 -- Seed Cloud — Serverless-compatible persistent state (Vercel)
--- Run this in the Supabase SQL editor AFTER db/schema.sql and
--- db/migration_google_storage.sql. This table is REQUIRED once the backend
--- runs on Vercel serverless functions and OAuth provider connects are used.
+-- Run this in the Supabase SQL editor AFTER db/schema.sql. This table is
+-- REQUIRED once the backend runs on Vercel serverless functions and OAuth
+-- provider connects are used.
 --
 -- Vercel serverless functions share no process memory, so state that previously
 -- lived in an in-process Map (OAuth authorization state) must be persisted here
 -- instead. Written and read only by the backend using the service_role key
 -- (which bypasses RLS).
 
--- OAuth authorization state for:
---   * provider connects  (/api/oauth/:slug/start -> /api/oauth/:slug/callback)
---   * the internal Google Drive backend authorization (/api/storage/google/*)
+-- OAuth authorization state for provider connects
+-- (/api/oauth/:slug/start -> /api/oauth/:slug/callback).
 -- Rows are single-use (deleted on consume) and expire after 10 minutes.
 create table if not exists public.oauth_state (
   state text primary key,

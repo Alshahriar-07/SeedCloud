@@ -24,7 +24,6 @@ app.get('/api/config', (req, res) => {
     supabaseUrl: config.supabaseUrl,
     supabaseAnonKey: config.supabaseAnonKey,
     pcloudConfigured: Boolean(config.pcloud.clientId && config.pcloud.clientSecret),
-    googleConfigured: Boolean(config.google.clientId && config.google.clientSecret && config.google.redirectUri),
   });
 });
 
@@ -44,7 +43,8 @@ app.use('/api/providers', providersRoutes);
 app.use('/api/providers/pcloud', pcloudRoutes);
 app.use('/api/shares', sharesRoutes);
 
-// Seed Cloud internal default storage backend (Google Drive + quota + files).
+// Seed Cloud storage router: logical quota (/api/storage) + file metadata
+// routed to the user's connected providers (/api/files).
 app.use('/api/storage', storageRoutes);
 app.use('/api/files', filesRoutes);
 

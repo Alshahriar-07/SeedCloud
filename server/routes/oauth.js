@@ -136,6 +136,7 @@ export async function handleOAuthCallback(req, res) {
 
     const conn = {
       accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken || null,
       tokenType: tokens.tokenType,
       apiHost: req.query.hostname || null,
     };
@@ -181,6 +182,7 @@ export async function handleOAuthCallback(req, res) {
       display_name: account.email || account.accountId || provider.name,
       email: account.email || null,
       access_token: encryptToken(tokens.accessToken),
+      refresh_token: tokens.refreshToken ? encryptToken(tokens.refreshToken) : null,
       token_type: tokens.tokenType,
       api_host: conn.apiHost,
       status: 'connected',

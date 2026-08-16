@@ -18,6 +18,7 @@ create table if not exists public.connected_accounts (
   display_name text,
   email text,
   access_token text not null,
+  refresh_token text,
   token_type text,
   api_host text,
   status text not null default 'connected',
@@ -41,6 +42,7 @@ alter table public.connected_accounts drop constraint if exists connected_accoun
 alter table public.connected_accounts add column if not exists email text;
 alter table public.connected_accounts add column if not exists storage_total bigint;
 alter table public.connected_accounts add column if not exists storage_used bigint;
+alter table public.connected_accounts add column if not exists refresh_token text;
 
 do $$
 begin
@@ -75,13 +77,15 @@ create policy "users delete own connected accounts"
 -- Provider credentials must never be readable by normal frontend clients.
 -- The backend reads them with the service_role key, which bypasses both RLS
 -- and column-level grants. Frontend clients (anon/authenticated) therefore
--- cannot read or overwrite the access_token column directly.
+-- cannot read or overwrite the access_token / refresh_token columns directly.
 revoke select (access_token) on public.connected_accounts from anon, authenticated;
 revoke update (access_token) on public.connected_accounts from anon, authenticated;
+revoke select (refresh_token) on public.connected_accounts from anon, authenticated;
+revoke update (refresh_token) on public.connected_accounts from anon, authenticated;
 
 insert into public.storage_providers (name, slug, enabled, capabilities) values
   ('pCloud', 'pcloud', true, '{"oauth":true,"list":true,"upload":true,"download":true,"folder":true,"rename":true,"delete":true,"share":true,"quota":true}'),
-  ('Google Drive', 'google-drive', true, '{"oauth":true}'),
+  ('Google Drive', 'google-drive', true, '{"oauth":true,"list":true,"upload":true,"download":true,"folder":true,"rename":true,"delete":true,"quota":true}'),
   ('Microsoft OneDrive', 'onedrive', true, '{"oauth":true}'),
   ('Dropbox', 'dropbox', true, '{"oauth":true}'),
   ('Koofr', 'koofr', true, '{"oauth":true}'),
@@ -169,9 +173,10 @@ create policy "users update own shares"
 create policy "users delete own shares"
   on public.file_shares for delete to authenticated using (auth.uid() = user_id);
 
--- Per-user Seed Cloud quota (default 512 MiB / 536,870,912 bytes) + user Drive
--- folder id. Actual file bytes stay on the connected cloud provider; Supabase
--- stores only quota + usage + file metadata + provider location.
+-- Per-user Seed Cloud quota (default 512 MiB / 536,870,912 bytes). Actual file
+-- bytes stay on the connected cloud provider; Supabase stores only quota +
+-- usage + file metadata + provider location. There is no internal/default Seed
+-- Cloud storage backend.
 -- is_over_quota marks accounts whose usage exceeds the limit (migrated from the
 -- old 1 GiB default): no files are deleted, but new uploads are blocked until
 -- usage drops back under the limit.

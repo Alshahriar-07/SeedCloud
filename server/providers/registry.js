@@ -39,7 +39,7 @@ const PROVIDERS = [
     freeTier: '15 GB free',
     status: PROVIDER_STATUS.supported,
     oauth: true,
-    implemented: false,
+    implemented: true,
   },
   {
     id: 'onedrive',

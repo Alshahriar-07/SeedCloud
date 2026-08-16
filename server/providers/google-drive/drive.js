@@ -1,8 +1,6 @@
-import { Readable } from 'node:stream';
-
 // Server-side Google Drive API client (Google OAuth2 + Drive v3) built on the
-// global fetch. Used for Seed Cloud's INTERNAL default storage backend (the
-// Seed Cloud owner's Google Drive account). Never import this in the browser.
+// global fetch. Used when a user connects THEIR OWN Google Drive account as a
+// cloud provider (OAuth scope: drive.file). Never import this in the browser.
 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -115,6 +113,18 @@ export class GoogleDrive {
     return this.api('/about', { params: { fields: 'user(emailAddress,displayName)' } });
   }
 
+  // Returns { used, total } in bytes from the user's Drive storage quota.
+  async aboutStorage() {
+    const data = await this.api('/about', {
+      params: { fields: 'storageQuota(limit,usage,usageInDrive)' },
+    });
+    const quota = (data && data.storageQuota) || {};
+    return {
+      used: Number(quota.usageInDrive ?? quota.usage) || 0,
+      total: Number(quota.limit) || null,
+    };
+  }
+
   async createFolder(name, parentId) {
     const body = { name, mimeType: FOLDER_MIME };
     if (parentId) body.parents = [parentId];
@@ -193,10 +203,4 @@ export class GoogleDrive {
     if (!res.ok) throw new Error(`Google Drive download failed (HTTP ${res.status})`);
     return res;
   }
-}
-
-export function webStreamToNode(webStream) {
-  if (!webStream) throw new Error('No response body');
-  if (typeof webStream[Symbol.asyncIterator] === 'function') return Readable.from(webStream);
-  return Readable.fromWeb(webStream);
 }

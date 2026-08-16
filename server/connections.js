@@ -1,5 +1,6 @@
 import { adminClient } from './supabase.js';
 import { decryptToken } from './token-encryption.js';
+import { getProvider } from './providers/index.js';
 
 const providerIdCache = new Map();
 
@@ -37,6 +38,14 @@ function withDecryptedToken(row) {
     } catch (err) {
       console.error('[connections] Failed to decrypt provider token:', err.message);
       row.access_token = null;
+    }
+  }
+  if (row.refresh_token) {
+    try {
+      row.refresh_token = decryptToken(row.refresh_token);
+    } catch (err) {
+      console.error('[connections] Failed to decrypt provider refresh token:', err.message);
+      row.refresh_token = null;
     }
   }
   return row;
@@ -85,4 +94,26 @@ export async function getConnectionById({ id, userId, providerId }) {
   const { data, error } = await query.maybeSingle();
   if (error && error.code !== '42P01') throw error;
   return withDecryptedToken(data);
+}
+
+// The user's most recently connected, active provider account across ALL
+// providers, with the token decrypted and the adapter resolved. Returns null
+// when the user has no connected cloud. Used by the file router to decide where
+// an upload/folder-create should land (deterministic: newest connection wins).
+export async function getPrimaryConnection(userId) {
+  const { data, error } = await adminClient
+    .from('connected_accounts')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'connected')
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error && error.code !== '42P01') throw error;
+  if (!data) return null;
+  const conn = withDecryptedToken(data);
+  const slug = await getProviderSlugById(conn.provider_id);
+  const provider = slug ? getProvider(slug) : null;
+  if (!provider) return null;
+  return { conn, provider };
 }

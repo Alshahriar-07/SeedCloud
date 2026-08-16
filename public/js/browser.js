@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { store } from './store.js';
+import { store, hasConnectedCloud } from './store.js';
 import * as downloads from './downloads.js';
 import { navigate } from './router.js';
 import {
@@ -150,20 +150,31 @@ function renderFiles() {
   });
 
   if (!visible.length) {
-    body.append(
-      emptyState({
-        icon: query ? 'search' : 'folder_open',
-        title: query ? 'No files match your search' : 'No files yet',
-        body: query
-          ? 'Try a different search or clear the filter.'
-          : store.seed && store.seed.limit
-            ? `Upload your first file to get started. You have ${formatBytes(store.seed.limit)} of Seed Cloud storage.`
-            : 'Upload your first file to get started.',
-        action: query
-          ? null
-          : h('button', { class: 'btn btn-primary', onclick: () => navigate('/upload') }, [icon('upload', { size: 14 }), 'Upload files']),
-      })
-    );
+    if (!query && !hasConnectedCloud()) {
+      body.append(
+        emptyState({
+          icon: 'cloud',
+          title: 'No cloud storage connected yet',
+          body: 'Connect a cloud storage provider (such as pCloud or your own Google Drive) to start storing files.',
+          action: h('button', { class: 'btn btn-primary', onclick: () => navigate('/clouds') }, [icon('harddrive', { size: 14 }), 'Connect a cloud']),
+        })
+      );
+    } else {
+      body.append(
+        emptyState({
+          icon: query ? 'search' : 'folder_open',
+          title: query ? 'No files match your search' : 'No files yet',
+          body: query
+            ? 'Try a different search or clear the filter.'
+            : store.seed && store.seed.limit
+              ? `Upload your first file to get started. You have ${formatBytes(store.seed.limit)} of Seed Cloud storage.`
+              : 'Upload your first file to get started.',
+          action: query
+            ? null
+            : h('button', { class: 'btn btn-primary', onclick: () => navigate('/upload') }, [icon('upload', { size: 14 }), 'Upload files']),
+        })
+      );
+    }
     container.append(body);
     return;
   }

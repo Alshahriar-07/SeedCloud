@@ -72,7 +72,7 @@ if (!config.pcloud.clientId || !config.pcloud.clientSecret) {
 
 if (!config.google.clientId || !config.google.clientSecret || !config.google.redirectUri) {
   console.warn(
-    '[config] GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI not set. The internal Google Drive storage backend will be disabled.'
+    '[config] GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI not set. Connecting a user\u2019s own Google Drive will be disabled.'
   );
 }
 

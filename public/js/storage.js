@@ -1,12 +1,12 @@
 import { api } from './api.js';
 import { store, refreshSeedStorage } from './store.js';
 import { navigate } from './router.js';
-import { qs, h, formatBytes, formatStorageBytes, emptyState, toast } from './ui.js';
+import { qs, h, formatBytes, formatStorageBytes, emptyState } from './ui.js';
 import { icon, providerIcon } from './icons.js';
 
-// The Storage page shows the user's Seed Cloud logical quota (512 MB) — the
-// backend Google Drive account's own capacity is never surfaced. It also keeps
-// the "By provider" breakdown for the user's personal cloud connections.
+// The Storage page shows the user's Seed Cloud logical quota (512 MB) plus the
+// "By provider" breakdown of the user's personal cloud connections. Seed Cloud
+// has no internal storage backend of its own.
 
 async function refreshProviderUsage() {
   store.storageByProvider = {};
@@ -84,17 +84,6 @@ export function renderSidebar() {
   }
 }
 
-// Starts the OAuth consent for Seed Cloud's owner Google Drive account. This is
-// backend infrastructure — it is intentionally NOT shown on the Clouds page.
-export function authorizeBackendStorage() {
-  api
-    .get('/api/storage/google/start')
-    .then((data) => {
-      window.location.href = data.url;
-    })
-    .catch((err) => toast(err.message || 'Could not start storage authorization', 'error'));
-}
-
 export async function render() {
   const container = qs('#view-storage');
   buildDom(container);
@@ -146,23 +135,9 @@ function buildDom(container) {
     summary.append(
       h('div', { class: 'notice warn', style: 'margin:0' }, [
         icon('alert', { size: 15 }),
-        h('span', {}, [
-          store.googleConfigured
-            ? 'Seed Cloud storage is not authorized yet.'
-            : 'Seed Cloud storage is not configured on this server yet.',
-        ]),
+        h('span', {}, ['Storage information is unavailable right now. Please try again.']),
       ])
     );
-    if (store.googleConfigured) {
-      summary.append(
-        h('div', { class: 'empty-action', style: 'margin-top:12px' }, [
-          h('button', { class: 'btn btn-primary', onclick: authorizeBackendStorage }, [
-            icon('harddrive', { size: 14 }),
-            'Authorize Seed Cloud storage',
-          ]),
-        ])
-      );
-    }
   }
 
   body.append(h('section', { class: 'section' }, [

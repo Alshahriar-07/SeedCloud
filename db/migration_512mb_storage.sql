@@ -6,7 +6,7 @@
 -- This migration is self-contained. It works whether the live database has
 -- NEVER had the Seed Cloud schema applied (only a legacy empty `files` table)
 -- or already has `public.user_storage` from an older migration. It does NOT
--- depend on db/schema.sql or db/migration_google_storage.sql having been run.
+-- depend on db/schema.sql or db/migration_provider_files.sql having been run.
 --
 -- What it does:
 --   1. Creates public.user_storage (if missing) with the correct columns,

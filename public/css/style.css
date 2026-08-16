@@ -1776,7 +1776,7 @@ tr:hover .file-icon { color: var(--text-secondary); }
   .docs-title { font-size: 24px; }
   .docs-provider-grid { grid-template-columns: 1fr; }
 }
-/* Seed Cloud storage backend */
+/* Seed Cloud file browser */
 .folder-path {
   display: flex;
   align-items: center;

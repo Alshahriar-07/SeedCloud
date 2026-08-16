@@ -16,7 +16,7 @@
 --      once (storage_limit = 536870912, storage_used = 0). The user_id primary
 --      key makes duplicates impossible.
 --
--- Run AFTER db/schema.sql and db/migration_google_storage.sql.
+-- Run AFTER db/schema.sql and db/migration_provider_files.sql.
 
 -- 1. Existing tables: add the over-quota flag and the new default limit.
 alter table public.user_storage add column if not exists is_over_quota boolean not null default false;

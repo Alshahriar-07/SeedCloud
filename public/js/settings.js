@@ -109,7 +109,7 @@ export async function render() {
         title: 'Usage',
         desc: s.ready
           ? `${formatStorageBytes(s.used)} used · ${formatStorageBytes(s.available)} free of ${formatStorageBytes(s.limit)}`
-          : 'Seed Cloud storage is not configured yet.',
+          : 'Storage information is unavailable right now.',
         action: h('button', { class: 'btn btn-secondary btn-sm', onclick: () => { window.location.href = '/storage'; } }, ['Details']),
       }),
       settingsRow({

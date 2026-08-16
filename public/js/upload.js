@@ -1,8 +1,9 @@
-import { store } from './store.js';
+import { store, hasConnectedCloud } from './store.js';
 import { qs, h, toast, promptModal, formatBytes, fileIcon } from './ui.js';
 import { icon } from './icons.js';
 import * as browser from './browser.js';
 import { api } from './api.js';
+import { navigate } from './router.js';
 
 const tasks = new Map();
 let idCounter = 0;
@@ -55,7 +56,15 @@ export function renderPage() {
     body.append(
       h('div', { class: 'notice warn', style: 'margin-bottom:12px' }, [
         icon('alert', { size: 15 }),
-        h('span', {}, ['Seed Cloud storage is not ready yet. Files cannot be uploaded.']),
+        h('span', {}, ['Storage information is unavailable right now. Please try again.']),
+      ])
+    );
+  } else if (!hasConnectedCloud()) {
+    body.append(
+      h('div', { class: 'notice warn', style: 'margin-bottom:12px' }, [
+        icon('alert', { size: 15 }),
+        h('span', {}, ['Connect a cloud storage provider before uploading files.']),
+        h('button', { class: 'btn btn-sm btn-primary', style: 'margin-left:12px', onclick: () => navigate('/clouds') }, ['Connect a cloud']),
       ])
     );
   }
@@ -108,7 +117,11 @@ function hideMenu(menu) {
 
 function createFolder() {
   if (!storageReady()) {
-    toast('Seed Cloud storage is not ready yet.', 'error');
+    toast('Storage information is unavailable right now. Please try again.', 'error');
+    return;
+  }
+  if (!hasConnectedCloud()) {
+    toast('Connect a cloud storage provider before creating folders.', 'error');
     return;
   }
   promptModal({
@@ -185,7 +198,13 @@ function ensurePanel(show) {
 function startUpload(task) {
   if (!storageReady()) {
     task.status = 'error';
-    task.error = 'Seed Cloud storage is not ready yet.';
+    task.error = 'Storage information is unavailable right now.';
+    renderTask(task);
+    return;
+  }
+  if (!hasConnectedCloud()) {
+    task.status = 'error';
+    task.error = 'Connect a cloud storage provider before uploading files.';
     renderTask(task);
     return;
   }

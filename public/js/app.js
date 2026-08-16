@@ -82,8 +82,6 @@ function handleUrlParams() {
   const params = new URLSearchParams(window.location.search);
   const connected = params.get('connected');
   const error = params.get('connect_error');
-  const storage = params.get('storage');
-  const storageError = params.get('storage_error');
 
   const ERROR_MESSAGES = {
     cancelled: 'You cancelled the connection. No changes were made.',
@@ -98,14 +96,6 @@ function handleUrlParams() {
     unknown: 'Could not complete the connection. Please try again.',
   };
 
-  const STORAGE_ERROR_MESSAGES = {
-    cancelled: 'Seed Cloud storage authorization was cancelled.',
-    state: 'Seed Cloud storage authorization could not be verified. Please try again.',
-    expired: 'Seed Cloud storage authorization expired. Please try again.',
-    refresh: 'Google did not return a refresh token. Try again from a fresh consent screen.',
-    unknown: 'Could not connect Seed Cloud storage. Please try again.',
-  };
-
   if (connected) {
     toast(`${providerName(connected)} connected`, 'success');
   }
@@ -115,13 +105,7 @@ function handleUrlParams() {
       'error'
     );
   }
-  if (storage) {
-    toast('Seed Cloud storage connected', 'success');
-  }
-  if (storageError) {
-    toast(STORAGE_ERROR_MESSAGES[storageError] || 'Could not connect Seed Cloud storage.', 'error');
-  }
-  if (connected || error || storage || storageError) {
+  if (connected || error) {
     window.history.replaceState({}, '', normalizePath(window.location.pathname));
   }
 }
@@ -129,7 +113,6 @@ function handleUrlParams() {
 async function init() {
   const cfg = await api.get('/api/config');
   store.supabase = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
-  store.googleConfigured = Boolean(cfg.googleConfigured);
 
   const { data } = await store.supabase.auth.getSession();
   if (!data.session) {
