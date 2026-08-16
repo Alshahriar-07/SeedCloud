@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#09090B">
+  <title>Seed Cloud — Check your inbox</title>
+  <link rel="icon" href="/assets/favicon/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon/favicon-16.png">
+  <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="auth-page">
+  <div class="auth-loading" id="auth-loading">
+    <img class="auth-loading-mark" src="/assets/icon.png" alt="Seed Cloud">
+    <div class="auth-loading-label">Checking session…</div>
+    <div class="auth-loading-spinner"><span class="spinner"></span></div>
+  </div>
+  <div class="auth-shell">
+    <header class="auth-brand">
+      <img class="auth-mark" src="/assets/icon.png" alt="Seed Cloud logo">
+      <div class="auth-brand-text">
+        <span class="auth-name">Seed Cloud</span>
+        <span class="auth-sub">Universal cloud storage</span>
+      </div>
+    </header>
+
+    <main class="auth-panel" style="text-align:center">
+      <div class="verify-icon-tile">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+        <span class="verify-check" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </span>
+      </div>
+      <h1 class="auth-title" style="font-size:18px;margin-bottom:8px">Check your inbox</h1>
+      <p class="verify-email-line">
+        We sent a confirmation email to
+        <strong id="verify-email">your email</strong>.
+      </p>
+      <p class="verify-note">
+        Click the link in the email to activate your Seed Cloud account.
+      </p>
+
+      <a class="btn btn-primary btn-block" id="open-email-btn" href="#" target="_blank" rel="noopener">
+        Open Email
+      </a>
+
+      <div class="verify-resend">
+        <p class="verify-resend-text">Didn't receive it?</p>
+        <button class="btn btn-ghost" id="resend-btn" type="button">Resend email</button>
+        <div class="verify-resend-status" id="resend-status" hidden></div>
+      </div>
+
+      <div class="verify-back">
+        <a href="/">Back to Sign in</a>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast-wrap" id="toast-wrap"></div>
+
+  <script src="/vendor/supabase.js"></script>
+  <script src="/js/auth-utils.js"></script>
+  <script src="/js/verify-email.js"></script>
+</body>
+</html>

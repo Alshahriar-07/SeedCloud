@@ -1,0 +1,11 @@
+1st : opencode -s ses_ff6dcb9b7ffeyTEGIr4TCTCWck
+2nd : opencode -s ses_ff6bab010ffeHJU62ZKC4mFtgd
+3rd : opencode -s ses_ff6adec7bffetE9kP4CAYTqJnb
+4th : opencode -s ses_ff64add5fffeA1C6ey7zkVo9Qn
+5th : opencode -s ses_ff6272ddeffe37jowvR53DVL3R
+
+
+
+Capcha :  opencode -s ses_ff623699dffeEMl7ssI6QHRDSt
+
+current : opencode -s ses_ff6124101ffeCs7iSWbPs9iEAe

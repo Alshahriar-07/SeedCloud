@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#09090B">
+  <title>Cloud connections — Seed Cloud</title>
+  <link rel="icon" href="/assets/favicon/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon/favicon-16.png">
+  <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="docs-page">
+  <header class="docs-top">
+    <a class="brand-link" href="/" aria-label="Seed Cloud">
+      <img class="brand-mark" src="/assets/icon.png" alt="Seed Cloud logo">
+      <span class="brand-name">Seed Cloud</span>
+    </a>
+    <a class="btn btn-sm btn-primary" href="/clouds">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+      Open Clouds
+    </a>
+  </header>
+
+  <main class="docs-main">
+    <div class="docs-head">
+      <h1 class="docs-title">Cloud connections</h1>
+      <p class="docs-sub">How Seed Cloud connects to your existing cloud accounts, where your files live, and how you stay in control.</p>
+    </div>
+
+    <section class="docs-section">
+      <h2 class="docs-h2">
+        <span class="docs-step-num">1</span>
+        How connections work
+      </h2>
+      <p class="docs-p">Seed Cloud never creates cloud accounts for you. You sign in with a cloud account you already own, approve the connection once, and Seed Cloud records that the account is connected.</p>
+      <ol class="docs-steps">
+        <li><span class="docs-chip">1</span><span>Choose a cloud provider.</span></li>
+        <li><span class="docs-chip">2</span><span>Click <strong>Connect</strong>.</span></li>
+        <li><span class="docs-chip">3</span><span>Sign in directly on the provider’s website.</span></li>
+        <li><span class="docs-chip">4</span><span>Review and approve the requested permissions.</span></li>
+        <li><span class="docs-chip">5</span><span>You return to Seed Cloud.</span></li>
+        <li><span class="docs-chip">6</span><span>The cloud shows as <strong>Connected</strong>.</span></li>
+      </ol>
+      <p class="docs-p">Seed Cloud stores metadata about the connection (account name, email, storage totals). It does <strong>not</strong> copy your files into its own storage. Files stay where they are.</p>
+    </section>
+
+    <section class="docs-section">
+      <h2 class="docs-h2">
+        <span class="docs-step-num">2</span>
+        How OAuth works (in plain language)
+      </h2>
+      <p class="docs-p">Seed Cloud uses the same “Sign in with …” system (OAuth) that websites use for social logins. Instead of asking for your cloud password, Seed Cloud sends you to the provider, the provider verifies who you are, and the provider hands Seed Cloud a limited-use access token.</p>
+      <ul class="docs-list">
+        <li><span class="docs-list-icon">✓</span><span>Seed Cloud never sees or stores your cloud password.</span></li>
+        <li><span class="docs-list-icon">✓</span><span>Authentication happens entirely on the provider’s website.</span></li>
+        <li><span class="docs-list-icon">✓</span><span>The token lets Seed Cloud act only within the permissions you approve.</span></li>
+        <li><span class="docs-list-icon">✓</span><span>You can disconnect at any time, and the token is removed.</span></li>
+      </ul>
+    </section>
+
+    <section class="docs-section">
+      <h2 class="docs-h2">
+        <span class="docs-step-num">3</span>
+        Available providers
+      </h2>
+      <p class="docs-p">Every provider is shown on the Clouds page. Each is clearly marked as available, coming soon, limited, or unavailable — Seed Cloud never offers a Connect button where a legitimate integration doesn’t exist.</p>
+
+      <h3 class="docs-h3">Supported</h3>
+      <p class="docs-p">Officially documented integrations. pCloud is ready now; the rest are implemented next.</p>
+      <div class="docs-provider-grid">
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark pcloud">p</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">pCloud</div>
+            <div class="docs-provider-desc">Ready to connect</div>
+          </div>
+          <span class="docs-provider-state available">Available</span>
+        </div>
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark google-drive">G</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">Google Drive</div>
+            <div class="docs-provider-desc">15 GB free</div>
+          </div>
+          <span class="docs-provider-state soon">Coming soon</span>
+        </div>
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark onedrive">O</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">Microsoft OneDrive</div>
+            <div class="docs-provider-desc">5 GB free</div>
+          </div>
+          <span class="docs-provider-state soon">Coming soon</span>
+        </div>
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark box">B</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">Box</div>
+            <div class="docs-provider-desc">10 GB free</div>
+          </div>
+          <span class="docs-provider-state soon">Coming soon</span>
+        </div>
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark koofr">K</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">Koofr</div>
+            <div class="docs-provider-desc">Free tier available</div>
+          </div>
+          <span class="docs-provider-state soon">Coming soon</span>
+        </div>
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark dropbox">D</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">Dropbox</div>
+            <div class="docs-provider-desc">2 GB free</div>
+          </div>
+          <span class="docs-provider-state soon">Coming soon</span>
+        </div>
+      </div>
+
+      <h3 class="docs-h3">Limited</h3>
+      <p class="docs-p">These providers have an official API, but important pieces are missing — usually a standard OAuth approval flow — so Seed Cloud cannot connect them securely yet.</p>
+      <div class="docs-provider-grid">
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark mega">M</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">MEGA</div>
+            <div class="docs-provider-desc">Official SDK only, no OAuth consent flow</div>
+          </div>
+          <span class="docs-provider-state limited">Limited</span>
+        </div>
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark mediafire">M</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">MediaFire</div>
+            <div class="docs-provider-desc">API exists but no OAuth2</div>
+          </div>
+          <span class="docs-provider-state limited">Limited</span>
+        </div>
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark proton-drive">P</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">Proton Drive</div>
+            <div class="docs-provider-desc">SDKs exist, no third-party OAuth yet</div>
+          </div>
+          <span class="docs-provider-state limited">Limited</span>
+        </div>
+      </div>
+
+      <h3 class="docs-h3">Unavailable</h3>
+      <p class="docs-p">These providers have no legitimate public integration — no official API, no OAuth, or terms that forbid third-party access. Seed Cloud won’t use unofficial scraping or workarounds, so these stay unconnected.</p>
+      <div class="docs-provider-grid">
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark degoo">D</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">Degoo</div>
+            <div class="docs-provider-desc">No public API or OAuth</div>
+          </div>
+          <span class="docs-provider-state unsupported">Unavailable</span>
+        </div>
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark icedrive">I</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">Icedrive</div>
+            <div class="docs-provider-desc">No public API; WebDAV is paid-only</div>
+          </div>
+          <span class="docs-provider-state unsupported">Unavailable</span>
+        </div>
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark idrive">I</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">IDrive</div>
+            <div class="docs-provider-desc">No API for consumer accounts</div>
+          </div>
+          <span class="docs-provider-state unsupported">Unavailable</span>
+        </div>
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark icloud">i</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">Apple iCloud</div>
+            <div class="docs-provider-desc">No API for a user’s iCloud Drive</div>
+          </div>
+          <span class="docs-provider-state unsupported">Unavailable</span>
+        </div>
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark sync">S</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">Sync.com</div>
+            <div class="docs-provider-desc">No public API; third-party access forbidden</div>
+          </div>
+          <span class="docs-provider-state unsupported">Unavailable</span>
+        </div>
+        <div class="docs-provider-card">
+          <span class="docs-provider-mark internxt">I</span>
+          <div class="docs-provider-main">
+            <div class="docs-provider-name">Internxt</div>
+            <div class="docs-provider-desc">No public API for Internxt Drive</div>
+          </div>
+          <span class="docs-provider-state unsupported">Unavailable</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="docs-section">
+      <h2 class="docs-h2">
+        <span class="docs-step-num">4</span>
+        How to connect pCloud
+      </h2>
+      <ol class="docs-steps">
+        <li><span class="docs-chip">1</span><span>Open <a href="/clouds">Clouds</a>.</span></li>
+        <li><span class="docs-chip">2</span><span>Find pCloud.</span></li>
+        <li><span class="docs-chip">3</span><span>Click <strong>Connect pCloud</strong>.</span></li>
+        <li><span class="docs-chip">4</span><span>You’ll be taken to pCloud’s sign-in page.</span></li>
+        <li><span class="docs-chip">5</span><span>Sign in with your existing pCloud account.</span></li>
+        <li><span class="docs-chip">6</span><span>Review the permissions pCloud shows you.</span></li>
+        <li><span class="docs-chip">7</span><span>Approve the connection.</span></li>
+        <li><span class="docs-chip">8</span><span>You’ll return to Seed Cloud.</span></li>
+        <li><span class="docs-chip">9</span><span>pCloud shows as <strong>Connected</strong> with your real storage usage.</span></li>
+      </ol>
+      <p class="docs-p">If pCloud is marked <em>“not configured on this server”</em>, the server hasn’t been given the pCloud app credentials yet. The connection is never faked — Seed Cloud waits until the credentials are set.</p>
+    </section>
+
+    <section class="docs-section">
+      <h2 class="docs-h2">
+        <span class="docs-step-num">5</span>
+        How to disconnect
+      </h2>
+      <ol class="docs-steps">
+        <li><span class="docs-chip">1</span><span>Open <a href="/clouds">Clouds</a>.</span></li>
+        <li><span class="docs-chip">2</span><span>On the connected account, click <strong>Disconnect</strong>.</span></li>
+        <li><span class="docs-chip">3</span><span>Confirm in the dialog.</span></li>
+      </ol>
+      <p class="docs-p">Disconnecting removes Seed Cloud’s access token for that account and unlinks it. Your files remain in the cloud provider untouched. You can connect the same account again later.</p>
+    </section>
+
+    <section class="docs-section">
+      <h2 class="docs-h2">
+        <span class="docs-step-num">6</span>
+        Where do my files live?
+      </h2>
+      <p class="docs-p">Files always stay in the cloud provider where you uploaded them. Seed Cloud stores only metadata about them (name, size, provider, location). It never copies the actual file bytes into its own storage.</p>
+      <div class="docs-flow">
+        <span class="docs-flow-file">photo.jpg</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        <span class="docs-flow-provider">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+          pCloud
+        </span>
+      </div>
+      <p class="docs-p">Seed Cloud only records where the file lives — not a copy of the file itself.</p>
+    </section>
+
+    <section class="docs-section">
+      <h2 class="docs-h2">
+        <span class="docs-step-num">7</span>
+        Security &amp; privacy
+      </h2>
+      <ul class="docs-list">
+        <li><span class="docs-list-icon">✓</span><span>Seed Cloud never asks for or stores your cloud password.</span></li>
+        <li><span class="docs-list-icon">✓</span><span>You authenticate directly on the provider’s website.</span></li>
+        <li><span class="docs-list-icon">✓</span><span>Provider access tokens are kept server-side and never sent to the browser.</span></li>
+        <li><span class="docs-list-icon">✓</span><span>Tokens are encrypted at rest where a server key is configured.</span></li>
+        <li><span class="docs-list-icon">✓</span><span>Each connection belongs to exactly one Seed Cloud account; you can’t see anyone else’s.</span></li>
+        <li><span class="docs-list-icon">✓</span><span>Disconnecting removes the token and stops access without deleting your files.</span></li>
+      </ul>
+    </section>
+
+    <footer class="docs-foot">
+      <a class="btn" href="/clouds">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+        Back to Clouds
+      </a>
+    </footer>
+  </main>
+</body>
+</html>
