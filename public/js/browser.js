@@ -153,10 +153,12 @@ function renderFiles() {
     body.append(
       emptyState({
         icon: query ? 'search' : 'folder_open',
-        title: query ? 'No files match your search' : 'Your Seed Cloud storage is empty.',
+        title: query ? 'No files match your search' : 'No files yet',
         body: query
           ? 'Try a different search or clear the filter.'
-          : 'Upload your first file to get started. You have 512 MB of Seed Cloud storage.',
+          : store.seed && store.seed.limit
+            ? `Upload your first file to get started. You have ${formatBytes(store.seed.limit)} of Seed Cloud storage.`
+            : 'Upload your first file to get started.',
         action: query
           ? null
           : h('button', { class: 'btn btn-primary', onclick: () => navigate('/upload') }, [icon('upload', { size: 14 }), 'Upload files']),

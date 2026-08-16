@@ -138,7 +138,7 @@ function buildDom(container) {
       summary.append(
         h('div', { class: 'notice warn', style: 'margin-top:12px' }, [
           icon('alert', { size: 15 }),
-          h('span', {}, ['You are over your 512 MB storage limit. Uploads are paused until you free up space.']),
+          h('span', {}, [`You are over your ${formatStorageBytes(s.limit)} storage limit. Uploads are paused until you free up space.`]),
         ])
       );
     }
@@ -175,7 +175,7 @@ function buildDom(container) {
       emptyState({
         icon: 'upload',
         title: 'Your Seed Cloud storage is empty.',
-        body: 'Upload your first file to get started. You have 512 MB of Seed Cloud storage.',
+        body: `Upload your first file to get started. You have ${formatStorageBytes(s.limit)} of Seed Cloud storage.`,
         action: h('button', { class: 'btn btn-primary', onclick: () => navigate('/upload') }, [icon('upload', { size: 14 }), 'Upload files']),
       })
     );

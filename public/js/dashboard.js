@@ -62,7 +62,7 @@ function storageSection() {
         s.overQuota
           ? h('div', { class: 'notice warn', style: 'margin-top:12px' }, [
               icon('alert', { size: 15 }),
-              h('span', {}, ['You are over your 512 MB storage limit. Uploads are paused until you free up space.']),
+              h('span', {}, [`You are over your ${formatStorageBytes(s.limit)} storage limit. Uploads are paused until you free up space.`]),
             ])
           : null,
       ])

@@ -118,36 +118,22 @@ async function readUserStorage(userId) {
   }
   if (isMissingTable(error)) {
     throw new StorageBackendError(
-      'Seed Cloud storage database is not set up yet. Apply db/migration_google_storage.sql in the Supabase SQL editor.',
+      'Seed Cloud storage database is not set up yet. Apply db/migration_512mb_storage.sql in the Supabase SQL editor.',
       'schema_missing'
     );
   }
   return data;
 }
 
-// Every user gets a user_storage row (512 MB quota) and their own Drive folder
-// Seed Cloud Storage/<user_id>/ whose id is persisted (never name-based lookup).
-// New user records are created automatically by a database trigger on auth.users
-// insert (db/migration_quota_512mb.sql). This function is the lazy fallback: it
-// never creates a duplicate row (user_id is the primary key) and it fills in the
-// Drive folder id once the backend Drive account is ready.
+// Every user gets a user_storage row (512 MB quota). New user records are
+// created automatically by a database trigger on auth.users insert
+// (db/migration_512mb_storage.sql). This function is the lazy fallback: it
+// never creates a duplicate row (user_id is the primary key / unique index) and
+// it NEVER touches the Drive backend, so quota reads work even before the
+// Google Drive storage backend is authorized.
 export async function ensureUserStorage(userId) {
   let data = await readUserStorage(userId);
-  if (data && data.root_folder_id) return data;
-
-  const rootFolderId = await ensureRootFolder();
-  const drive = await getDrive();
-  const userFolder = await findOrCreateUserFolder(drive, rootFolderId, userId);
-
-  if (data) {
-    const { error: updError } = await adminClient
-      .from('user_storage')
-      .update({ root_folder_id: userFolder.id, updated_at: new Date().toISOString() })
-      .eq('user_id', userId);
-    if (updError) throw new StorageBackendError('Could not persist your storage folder.', 'database');
-    data.root_folder_id = userFolder.id;
-    return data;
-  }
+  if (data) return data;
 
   // Idempotent insert: if a concurrent trigger already created the row, the
   // upsert is ignored and we simply reuse it below.
@@ -158,20 +144,34 @@ export async function ensureUserStorage(userId) {
         user_id: userId,
         storage_limit: config.storage.defaultQuotaBytes,
         storage_used: 0,
-        root_folder_id: userFolder.id,
       },
       { onConflict: 'user_id', ignoreDuplicates: true }
     );
   if (insError) throw new StorageBackendError('Could not create your storage record.', 'database');
 
   const rec = await readUserStorage(userId);
-  if (rec && !rec.root_folder_id) {
-    await adminClient
-      .from('user_storage')
-      .update({ root_folder_id: userFolder.id, updated_at: new Date().toISOString() })
-      .eq('user_id', userId);
-    rec.root_folder_id = userFolder.id;
-  }
+  if (!rec) throw new StorageBackendError('Could not read your storage record.', 'database');
+  return rec;
+}
+
+// Ensures the user's storage row AND their own Drive folder
+// Seed Cloud Storage/<user_id>/ whose id is persisted (never name-based lookup).
+// Only operations that need a real Drive location call this (list, upload,
+// create folder); quota reads never do.
+export async function ensureUserFolder(userId) {
+  const rec = await ensureUserStorage(userId);
+  if (rec.root_folder_id) return rec;
+
+  const rootFolderId = await ensureRootFolder();
+  const drive = await getDrive();
+  const userFolder = await findOrCreateUserFolder(drive, rootFolderId, userId);
+
+  const { error: updError } = await adminClient
+    .from('user_storage')
+    .update({ root_folder_id: userFolder.id, updated_at: new Date().toISOString() })
+    .eq('user_id', userId);
+  if (updError) throw new StorageBackendError('Could not persist your storage folder.', 'database');
+  rec.root_folder_id = userFolder.id;
   return rec;
 }
 
@@ -206,7 +206,7 @@ export function safeFile(row) {
 // Lists the user's files inside a folder (defaults to their own root folder).
 // user_id is always taken from the authenticated session, never the client.
 export async function listFiles(userId, folderId = null) {
-  const rec = await ensureUserStorage(userId);
+  const rec = await ensureUserFolder(userId);
   const parent = folderId || rec.root_folder_id;
   let query = adminClient.from('files').select('*').eq('user_id', userId).order('name', { ascending: true });
   if (parent) query = query.eq('parent_folder_id', parent);
@@ -263,12 +263,12 @@ async function loadUsage(userId) {
 }
 
 export async function uploadFile({ userId, name, mimeType, data, folderId }) {
-  const rec = await ensureUserStorage(userId);
+  const rec = await ensureUserFolder(userId);
   const size = Buffer.byteLength(data);
   const used = Number(rec.storage_used) || 0;
   const limit = Number(rec.storage_limit) || config.storage.defaultQuotaBytes;
 
-  const quotaMessage = 'Storage limit reached. You have 512 MB of free storage.';
+  const quotaMessage = `Storage limit reached. You have ${formatBytes(limit)} of free storage.`;
   if (rec.is_over_quota || used + size > limit) {
     const err = new StorageBackendError(quotaMessage, 'quota_exceeded');
     err.status = 413;
@@ -333,7 +333,7 @@ export async function uploadFile({ userId, name, mimeType, data, folderId }) {
 }
 
 export async function createUserFolder(userId, name, folderId) {
-  const rec = await ensureUserStorage(userId);
+  const rec = await ensureUserFolder(userId);
   const clean = cleanName(name);
   if (!clean) throw new StorageBackendError('Invalid folder name.');
 
