@@ -3,3 +3,6 @@ node_modules/
 .env.local
 npm-debug.log*
 .DS_Store
+opencode/
+Seed-Cloud-Project-Docs/
+.env.example

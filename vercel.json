@@ -1,0 +1,27 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "builds": [
+    { "src": "api/index.js", "use": "@vercel/node" },
+    { "src": "public/**", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "api/index.js" },
+    { "src": "/", "dest": "/public/index.html" },
+    { "src": "/signup", "dest": "/public/signup.html" },
+    { "src": "/verify-email", "dest": "/public/verify-email.html" },
+    { "src": "/forgot-password", "dest": "/public/forgot-password.html" },
+    { "src": "/reset-password", "dest": "/public/reset-password.html" },
+    { "src": "/docs/cloud-connections", "dest": "/public/docs/cloud-connections.html" },
+    { "src": "/dashboard", "dest": "/public/app.html" },
+    { "src": "/files", "dest": "/public/app.html" },
+    { "src": "/upload", "dest": "/public/app.html" },
+    { "src": "/downloads", "dest": "/public/app.html" },
+    { "src": "/access", "dest": "/public/app.html" },
+    { "src": "/storage", "dest": "/public/app.html" },
+    { "src": "/clouds", "dest": "/public/app.html" },
+    { "src": "/profile", "dest": "/public/app.html" },
+    { "src": "/settings", "dest": "/public/app.html" },
+    { "src": "/(.*)", "dest": "/public/$1" }
+  ]
+}

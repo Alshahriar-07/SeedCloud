@@ -21,23 +21,27 @@ router.get('/', requireAuth, async (req, res, next) => {
   }
 });
 
-router.post('/:slug/connect', requireAuth, (req, res) => {
-  const result = buildOAuthStart({ user: req.user, slug: req.params.slug });
-  if (!result.ok) {
-    const messages = {
-      not_configured: 'This provider is not configured on this server yet',
-      coming_soon: 'This provider is not available for connecting yet',
-      unknown: 'Provider not found',
-    };
-    return res.status(503).json({ error: messages[result.error] || 'Could not start connection', code: result.error });
+router.post('/:slug/connect', requireAuth, async (req, res, next) => {
+  try {
+    const result = await buildOAuthStart({ user: req.user, slug: req.params.slug });
+    if (!result.ok) {
+      const messages = {
+        not_configured: 'This provider is not configured on this server yet',
+        coming_soon: 'This provider is not available for connecting yet',
+        unknown: 'Provider not found',
+      };
+      return res.status(503).json({ error: messages[result.error] || 'Could not start connection', code: result.error });
+    }
+    res.cookie('sc_oauth_state', result.state, {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 10 * 60 * 1000,
+      path: '/',
+    });
+    res.json({ url: result.url });
+  } catch (err) {
+    next(err);
   }
-  res.cookie('sc_oauth_state', result.state, {
-    httpOnly: true,
-    sameSite: 'lax',
-    maxAge: 10 * 60 * 1000,
-    path: '/',
-  });
-  res.json({ url: result.url });
 });
 
 router.get('/:slug/callback', (req, res, next) => {

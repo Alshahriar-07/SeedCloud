@@ -16,7 +16,7 @@ const router = Router();
 // the authenticated Seed Cloud user, then builds the provider authorization URL.
 // Returns { ok: true, state, url } or { ok: false, error } where error is a
 // short machine code mapped to a friendly message on the frontend.
-export function buildOAuthStart({ user, slug }) {
+export async function buildOAuthStart({ user, slug }) {
   const provider = getProvider(slug);
   const registry = getProviderConfig(slug);
   if (!provider || !registry) {
@@ -33,7 +33,7 @@ export function buildOAuthStart({ user, slug }) {
   }
 
   const providerConfig = config[provider.id];
-  const state = createOAuthState({ userId: user.id, provider: provider.id });
+  const state = await createOAuthState({ userId: user.id, provider: provider.id });
   const redirectUri = getRedirectUri(provider);
   const url = provider.getOAuthUrl({
     state,
@@ -45,22 +45,26 @@ export function buildOAuthStart({ user, slug }) {
 
 // GET /api/oauth/:slug/start
 // Requires an authenticated Seed Cloud user (Bearer token). Generates the
-// OAuth state, stores it single-use server-side, sets an httpOnly cookie, and
+// OAuth state, stores it single-use in Supabase, sets an httpOnly cookie, and
 // returns { url } so the SPA navigates to the provider. The provider redirects
 // back to GET /api/oauth/:slug/callback.
-router.get('/:slug/start', requireAuth, (req, res) => {
-  const result = buildOAuthStart({ user: req.user, slug: req.params.slug });
-  if (!result.ok) {
-    res.clearCookie('sc_oauth_state', { path: '/' });
-    return res.status(503).json({ error: oauthStartErrorMessage(result.error), code: result.error });
+router.get('/:slug/start', requireAuth, async (req, res, next) => {
+  try {
+    const result = await buildOAuthStart({ user: req.user, slug: req.params.slug });
+    if (!result.ok) {
+      res.clearCookie('sc_oauth_state', { path: '/' });
+      return res.status(503).json({ error: oauthStartErrorMessage(result.error), code: result.error });
+    }
+    res.cookie('sc_oauth_state', result.state, {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 10 * 60 * 1000,
+      path: '/',
+    });
+    res.json({ url: result.url });
+  } catch (err) {
+    next(err);
   }
-  res.cookie('sc_oauth_state', result.state, {
-    httpOnly: true,
-    sameSite: 'lax',
-    maxAge: 10 * 60 * 1000,
-    path: '/',
-  });
-  res.json({ url: result.url });
 });
 
 function oauthStartErrorMessage(code) {
@@ -102,9 +106,9 @@ export async function handleOAuthCallback(req, res) {
     return res.redirect('/clouds?connect_error=state');
   }
 
-  // consumeOAuthState removes the state, so it is single-use. A reused,
-  // missing or expired state returns null and is rejected here.
-  const oauth = consumeOAuthState(state);
+  // consumeOAuthState removes the state from Supabase, so it is single-use. A
+  // reused, missing or expired state returns null and is rejected here.
+  const oauth = await consumeOAuthState(state);
   if (!oauth || oauth.provider !== provider.id) {
     res.clearCookie('sc_oauth_state', { path: '/' });
     return res.redirect('/clouds?connect_error=expired');

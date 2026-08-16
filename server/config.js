@@ -9,9 +9,25 @@ function fail(message) {
 
 const port = Number(process.env.PORT) || 3000;
 
+// Resolves the public base URL used to build OAuth redirect_uri values.
+// 1. Explicit BASE_URL wins (recommended; set it to https://seedcloud.vercel.app
+//    in the Vercel project's production environment variables).
+// 2. On Vercel, fall back to the production URL Vercel exposes at runtime.
+// 3. Local development defaults to http://localhost:<port>.
+function resolveBaseUrl() {
+  if (process.env.BASE_URL) return process.env.BASE_URL.replace(/\/$/, '');
+  if (process.env.VERCEL) {
+    const vercelBase = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+    if (vercelBase) return `https://${vercelBase.replace(/^https?:\/\//, '')}`.replace(/\/$/, '');
+  }
+  return `http://localhost:${port}`;
+}
+
+const baseUrl = resolveBaseUrl();
+
 const config = {
   port,
-  baseUrl: (process.env.BASE_URL || `http://localhost:${port}`).replace(/\/$/, ''),
+  baseUrl,
   supabaseUrl: process.env.SUPABASE_URL,
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -42,6 +58,12 @@ for (const key of required) {
 
 if (!config.tokenEncryptionSecret) {
   console.warn('[config] TOKEN_ENCRYPTION_SECRET not set. Provider tokens will be stored in plaintext (dev only). Set it before production.');
+}
+
+if (process.env.VERCEL && !process.env.BASE_URL) {
+  console.warn(
+    `[config] On Vercel with BASE_URL unset; OAuth redirect URIs will be derived from the deployment URL (${baseUrl}). Set BASE_URL=https://seedcloud.vercel.app in production to keep redirect URIs stable.`
+  );
 }
 
 if (!config.pcloud.clientId || !config.pcloud.clientSecret) {

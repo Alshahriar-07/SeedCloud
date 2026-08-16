@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import crypto from 'node:crypto';
 import config from '../config.js';
 import { requireAuth } from '../middleware/auth.js';
 import { adminClient } from '../supabase.js';
@@ -12,12 +11,9 @@ import {
   saveBackendAccount,
 } from '../storage-service.js';
 import { readCookies } from '../utils/cookies.js';
+import { createOAuthState, consumeOAuthState } from '../oauth-state.js';
 
 const router = Router();
-
-// In-memory single-use OAuth state for the backend Google authorization.
-const stateStore = new Map();
-const STATE_TTL = 10 * 60 * 1000;
 
 function redirect(res, query) {
   res.redirect(`/storage?${query}`);
@@ -43,23 +39,27 @@ router.get('/', requireAuth, async (req, res, next) => {
 
 // GET /api/storage/google/start — starts the OAuth consent for Seed Cloud's
 // OWNER Google Drive account (backend infrastructure, not a user connection).
-// Requires an authenticated Seed Cloud user.
-router.get('/google/start', requireAuth, (req, res) => {
-  if (!googleConfigured()) {
-    return res.status(503).json({
-      error: 'The Google Drive storage backend is not configured on this server.',
-      code: 'not_configured',
+// Requires an authenticated Seed Cloud user. The state is persisted in Supabase
+// (survives Vercel serverless invocations) and single-use.
+router.get('/google/start', requireAuth, async (req, res, next) => {
+  try {
+    if (!googleConfigured()) {
+      return res.status(503).json({
+        error: 'The Google Drive storage backend is not configured on this server.',
+        code: 'not_configured',
+      });
+    }
+    const state = await createOAuthState({ userId: null, provider: 'google-storage' });
+    const url = GoogleDrive.getAuthUrl({
+      clientId: config.google.clientId,
+      redirectUri: config.google.redirectUri,
+      state,
     });
+    res.cookie('sc_google_state', state, { httpOnly: true, sameSite: 'lax', maxAge: 10 * 60 * 1000, path: '/' });
+    res.json({ url });
+  } catch (err) {
+    next(err);
   }
-  const state = crypto.randomBytes(24).toString('hex');
-  stateStore.set(state, { createdAt: Date.now() });
-  const url = GoogleDrive.getAuthUrl({
-    clientId: config.google.clientId,
-    redirectUri: config.google.redirectUri,
-    state,
-  });
-  res.cookie('sc_google_state', state, { httpOnly: true, sameSite: 'lax', maxAge: STATE_TTL, path: '/' });
-  res.json({ url });
 });
 
 // GET /api/storage/google/callback — OAuth redirect target. Exchanges the code,
@@ -73,15 +73,13 @@ router.get('/google/callback', async (req, res) => {
   }
 
   const cookies = readCookies(req);
-  const entry = stateStore.get(state);
-  if (!code || !state || state !== cookies.sc_google_state || !entry) {
+
+  // consumeOAuthState validates the state and removes it (single-use). It
+  // must also match the httpOnly cookie set by /google/start.
+  const oauth = await consumeOAuthState(state).catch(() => null);
+  if (!code || !state || state !== cookies.sc_google_state || !oauth || oauth.provider !== 'google-storage') {
     clearStateCookie(res);
     return redirect(res, 'storage_error=state');
-  }
-  stateStore.delete(state);
-  if (Date.now() - entry.createdAt > STATE_TTL) {
-    clearStateCookie(res);
-    return redirect(res, 'storage_error=expired');
   }
 
   try {
